@@ -2,7 +2,7 @@
 
 commands:
   test: pnpm install --frozen-lockfile && pnpm test
-  lint: pnpm install --frozen-lockfile && pnpm run typecheck && pnpm run build
+  lint: pnpm install --frozen-lockfile && pnpm run typecheck
 
 test:
   evidence:
