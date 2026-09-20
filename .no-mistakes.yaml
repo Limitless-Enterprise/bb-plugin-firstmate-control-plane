@@ -1,0 +1,11 @@
+# Per-repo no-mistakes overrides for the Fleet control-plane plugin.
+
+commands:
+  test: pnpm test
+  lint: pnpm run typecheck
+
+document:
+  instructions: |
+    Update README.md and docs/ when CLI surfaces, overlay apply paths, or M1
+    acceptance steps change. Keep packages/bb-backend/overlay docs aligned with
+    lib/apply-firstmate-integration.ts.
