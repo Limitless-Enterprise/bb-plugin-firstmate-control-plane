@@ -1,3 +1,5 @@
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { FleetStore } from "./db";
 import { projectFsm, verbForMark } from "./fsm";
@@ -353,6 +355,60 @@ export class FleetService {
       hostId: host.id,
       workspace,
     };
+  }
+
+  private async resolveCrewSpawnEnvironment(
+    node: FleetNode,
+    checkoutPath: string,
+  ) {
+    if (node.envId) {
+      return { type: "reuse" as const, environmentId: node.envId };
+    }
+    const metaPath = path.join(checkoutPath, "state", `${node.label}.meta`);
+    try {
+      const meta = await fs.readFile(metaPath, "utf8");
+      const worktreeMatch = meta.match(/^worktree=(.+)$/m);
+      const worktreePath = worktreeMatch?.[1]?.trim();
+      if (worktreePath) {
+        return await this.hostEnvironment({
+          type: "unmanaged",
+          path: worktreePath,
+        });
+      }
+    } catch {
+      // fall through to fresh managed worktree
+    }
+    return await this.hostEnvironment({
+      type: "managed-worktree",
+      baseBranch: { kind: "default" },
+    });
+  }
+
+  private async updateTaskMetaThreadId(
+    checkoutPath: string,
+    taskId: string,
+    threadId: string,
+    envId?: string | null,
+  ): Promise<void> {
+    const metaPath = path.join(checkoutPath, "state", `${taskId}.meta`);
+    try {
+      let meta = await fs.readFile(metaPath, "utf8");
+      meta = meta.replace(/^bb_thread_id=.*$/m, `bb_thread_id=${threadId}`);
+      const windowTarget = `@thread:${threadId}`;
+      if (/^window=.*$/m.test(meta)) {
+        meta = meta.replace(/^window=.*$/m, `window=${windowTarget}`);
+      }
+      if (envId) {
+        if (/^bb_env_id=.*$/m.test(meta)) {
+          meta = meta.replace(/^bb_env_id=.*$/m, `bb_env_id=${envId}`);
+        } else {
+          meta += `\nbb_env_id=${envId}\n`;
+        }
+      }
+      await fs.writeFile(metaPath, meta, "utf8");
+    } catch {
+      // task meta may not exist yet
+    }
   }
 
   async pickCheckoutFolder(clientHostId?: string): Promise<{
@@ -868,10 +924,7 @@ export class FleetService {
     const thread = await this.bb.sdk.threads.spawn({
       projectId: mateThread.projectId,
       parentThreadId: mateThread.id,
-      environment: await this.hostEnvironment({
-        type: "managed-worktree",
-        baseBranch: { kind: "default" },
-      }),
+      environment: await this.resolveCrewSpawnEnvironment(node, home.checkoutPath),
       prompt: text,
       title: `${role}: ${node.label}`,
       ...(profile?.model ? { model: profile.model } : {}),
@@ -886,6 +939,12 @@ export class FleetService {
         relaunchOf: threadId,
       },
     });
+    await this.updateTaskMetaThreadId(
+      home.checkoutPath,
+      node.label,
+      thread.id,
+      thread.environmentId ?? node.envId,
+    );
     const updated =
       this.store.updateNodeThread(node.id, thread.id, thread.environmentId ?? null) ??
       node;

@@ -26,4 +26,12 @@ describe("projectFsm", () => {
     ]);
     assert.equal(state, "blocked");
   });
+
+  it("stays done when pr.opened follows crew.done", () => {
+    const state = projectFsm([
+      { verb: "crew.done", fsmState: "done" },
+      { verb: "pr.opened", fsmState: "done" },
+    ]);
+    assert.equal(state, "done");
+  });
 });

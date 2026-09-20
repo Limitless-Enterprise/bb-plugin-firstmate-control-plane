@@ -41,15 +41,28 @@ export class StatusBridge {
       const lastMs = cursors[key] ?? 0;
       if (stat.mtimeMs <= lastMs) continue;
 
+      const advanceCursor = () => {
+        cursors[key] = stat.mtimeMs;
+      };
+
       const raw = await fs.readFile(filePath, "utf8");
       const lines = raw.split("\n").filter((line) => line.trim());
       const tail = lines.at(-1);
-      if (!tail) continue;
+      if (!tail) {
+        advanceCursor();
+        continue;
+      }
       const parsed = parseStatusLine(tail);
-      if (!parsed) continue;
+      if (!parsed) {
+        advanceCursor();
+        continue;
+      }
 
       const threadId = await this.resolveThreadId(checkoutPath, taskId);
-      if (!threadId) continue;
+      if (!threadId) {
+        advanceCursor();
+        continue;
+      }
 
       const fsm = fsmFromStatusPrefix(parsed.prefix);
       if (fsm) {
@@ -65,14 +78,20 @@ export class StatusBridge {
       if (parsed.prefix === "needs-decision:") {
         const home = this.store.getHome(homeId);
         if (home) {
-          this.fleet.openHold({
-            homeId,
-            mateId: home.primaryMateId,
-            threadId,
-            title: parsed.detail.slice(0, 120) || taskId,
-            body: parsed.raw,
-            urgency: "high",
-          });
+          const title = parsed.detail.slice(0, 120) || taskId;
+          const hasOpenHold = this.store
+            .listHolds(homeId, "open")
+            .some((hold) => hold.threadId === threadId && hold.title === title);
+          if (!hasOpenHold) {
+            this.fleet.openHold({
+              homeId,
+              mateId: home.primaryMateId,
+              threadId,
+              title,
+              body: parsed.raw,
+              urgency: "high",
+            });
+          }
         }
       }
 
@@ -94,7 +113,7 @@ export class StatusBridge {
             homeId,
             threadId,
             verb: "pr.opened",
-            fsmState: "working",
+            fsmState: "done",
             detail: { url: prUrl, taskId },
           });
           if (isChecksGreen(parsed.detail)) {
@@ -110,7 +129,7 @@ export class StatusBridge {
         }
       }
 
-      cursors[key] = stat.mtimeMs;
+      advanceCursor();
       ingested += 1;
     }
     await this.writeCursor(cursors);
@@ -122,6 +141,13 @@ export class StatusBridge {
     checkoutPath: string,
     taskId: string,
   ): Promise<string | null> {
+    for (const home of this.store.listHomes()) {
+      if (home.checkoutPath !== checkoutPath) continue;
+      const match = this.store
+        .listNodes(home.homeId)
+        .find((n) => n.label === taskId);
+      if (match) return match.threadId;
+    }
     const metaPath = path.join(checkoutPath, "state", `${taskId}.meta`);
     try {
       const meta = await fs.readFile(metaPath, "utf8");
@@ -130,14 +156,7 @@ export class StatusBridge {
       const windowMatch = meta.match(/^window=@thread:(.+)$/m);
       if (windowMatch?.[1]) return windowMatch[1].trim();
     } catch {
-      // fall through to registry lookup
-    }
-    for (const home of this.store.listHomes()) {
-      if (home.checkoutPath !== checkoutPath) continue;
-      const match = this.store
-        .listNodes(home.homeId)
-        .find((n) => n.label === taskId);
-      if (match) return match.threadId;
+      // no meta file
     }
     return null;
   }
