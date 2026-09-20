@@ -19,11 +19,17 @@ bb fleet spawn --mate cto --role ship --label auth --prompt "Ship the auth fix"
 bb fleet tree --mate cto
 bb fleet inbox --mate cto
 bb fleet digest --mate cto --tell-cos
+bb fleet bearings --mate cto
+bb fleet steer --mate cto --thread <threadId> --text "Continue on the PR feedback"
+bb fleet interrupt|exit|relaunch|detach --mate cto --thread <threadId>
+bb fleet integration apply --mate cto
+bb fleet integration check --mate cto
 ```
 
 ## Panel
 
-Open **Fleet** in the BB sidebar: home switcher, tree + ThreadChat, Inbox, and status board.
+Open **Fleet** in the BB sidebar: home switcher, tree + ThreadChat (mobile tree toggle),
+Inbox, status board, and crew overflow controls (interrupt, exit, relaunch, detach).
 
 ## Implementation plan
 
@@ -44,4 +50,5 @@ bb fleet integration apply --mate tech
 bb fleet integration check --mate tech
 ```
 
-See [integration/README.md](./integration/README.md).
+See [packages/bb-backend/overlay/README.md](./packages/bb-backend/overlay/README.md)
+(install layout) and [integration/README.md](./integration/README.md) (quick start).

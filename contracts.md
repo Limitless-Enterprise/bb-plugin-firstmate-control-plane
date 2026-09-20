@@ -139,6 +139,8 @@ Never auto-respawn on `ambiguous`.
 ## CoS notification
 
 - Digest via `bb fleet digest [--mate <homeId>] [--tell-cos]`.
+- Bearings snapshot via `bb fleet bearings [--mate <homeId>] [--json]` (digest +
+  open holds, unacked wakes, tracked PR links).
 - Captain attention via **Fleet Inbox** only — not Command Center inbox.
 
 ## Isolation
@@ -147,13 +149,20 @@ Every RPC enforces `homeId`. Cross-home reads/writes fail closed.
 
 ## Firstmate checkout overlay
 
-After clone/bootstrap, the plugin applies `.bb-integration/` to the mate checkout:
+**Authoritative copy:** [contracts/README.md](./contracts/README.md) (this file is
+migrating to `contracts/`).
 
-- Backs up native `bin/fm-spawn.sh` to `.bb-integration/native/bin/fm-spawn.sh`
-- Installs a stub `bin/fm-spawn.sh` that delegates to the overlay wrapper
-- Writes `config/bb-integration.json` with `{ enabled, homeId, mateThreadId, version }`
+After clone/bootstrap, the plugin applies overlay **v2** from `packages/bb-backend/overlay/`:
+
+- Backs up native `bin/fm-spawn.sh` and `bin/fm-backend.sh` under `.bb-integration/native/`
+- Installs wrappers as `bin/fm-spawn.sh` and `bin/fm-backend.sh` (adds `bb` backend)
+- Copies adapter scripts into `.bb-integration/bin/` and `bin/backends/bb.sh`
+- Writes `config/backend` (`bb`) and `config/bb-integration.json` with
+  `{ enabled, homeId, mateThreadId, version, appliedAtMs }`
 - Copies `docs/bb-integration/AGENTS.bb.md` for mate-thread instructions
 
 When `enabled: true`, ship/scout spawns call `bb fleet spawn` and register crew nodes.
-Unsupported modes (`--relaunch`, `--secondmate`) still use native Firstmate backends.
+`fm-spawn --relaunch` and `--secondmate` still use native Firstmate backends; crew
+relaunch on BB threads is via `bb fleet relaunch` or Fleet UI controls.
+
 Pure CLI use: set `enabled: false` or use a checkout without the overlay.

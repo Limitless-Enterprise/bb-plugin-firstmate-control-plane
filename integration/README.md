@@ -1,37 +1,17 @@
 # Firstmate ↔ BB integration overlay
 
-Portable patch layer installed into a Firstmate checkout by
-`firstmate-control-plane`. Keeps upstream Firstmate behavior intact for pure CLI
-use; when enabled, routes crew dispatch through BB Fleet.
+**Authoritative docs:** [packages/bb-backend/README.md](../packages/bb-backend/README.md)
+and [packages/bb-backend/overlay/README.md](../packages/bb-backend/overlay/README.md).
 
-## Layout (installed under `<checkout>/.bb-integration/`)
+The plugin applies overlay v2 from `packages/bb-backend/overlay/` via
+`bb fleet integration apply`. The `integration/bin/` scripts here are the
+retired v1 stub reference only — do not install them manually.
 
-```
-.bb-integration/
-  manifest.json
-  bin/
-    fm-spawn.sh       # wrapper entry (delegates to native or BB)
-    fm-bb-spawn.sh    # BB fleet spawn adapter
-    fm-bb-lib.sh      # shared helpers
-  native/
-    bin/
-      fm-spawn.sh     # pristine copy of upstream fm-spawn.sh
-docs/bb-integration/
-  AGENTS.bb.md        # mate-thread agent instructions
-config/
-  bb-integration.json # home + mate thread binding
-```
-
-## Install
-
-Automatic on `bb fleet home bootstrap` / checkout clone.
-
-Manual:
+## Quick start
 
 ```sh
 bb fleet integration apply --mate tech
+bb fleet integration check --mate tech
 ```
 
-## Versioning
-
-`manifest.json` records `integrationVersion`. Re-run apply after plugin upgrades.
+Automatic on `bb fleet home bootstrap` / checkout clone.

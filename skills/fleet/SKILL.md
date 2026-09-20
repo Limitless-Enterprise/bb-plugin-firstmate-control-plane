@@ -24,8 +24,11 @@ bb fleet secondmate create --mate cto --thread <threadId> --label platform-lead
 
 - `bb fleet tree --mate cto` — fleet tree
 - `bb fleet steer --mate cto --thread <id> --text "..."` — data-plane steer
-- `bb fleet interrupt|exit --mate cto --thread <id>` — control plane
+- `bb fleet interrupt|exit|relaunch|detach --mate cto --thread <id>` — control plane
 - `bb fleet inbox --mate cto` — Captain inbox
 - `bb fleet digest --mate cto --tell-cos` — CoS digest
+- `bb fleet bearings --mate cto` — CoS bearings snapshot
+- `bb fleet integration apply|check --mate cto` — overlay install/verify
 
-Open the **Fleet** panel in BB for tree + chat, inbox, and status board.
+Open the **Fleet** panel in BB for tree + chat (mobile tree toggle), inbox,
+status board, and crew overflow controls.

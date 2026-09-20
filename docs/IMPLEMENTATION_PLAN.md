@@ -53,7 +53,8 @@ bb-plugin-firstmate-control-plane/
 └── README.md
 ```
 
-**Retire on Phase 1:** `integration/bin/fm-spawn.sh` stub that bypasses native pipeline.
+**Retired (Phase 1):** v1 `integration/bin/fm-spawn.sh` stub — overlay v2 lives in
+`packages/bb-backend/overlay/` (see `lib/apply-firstmate-integration.ts`).
 
 ## 5. Milestones
 
@@ -176,8 +177,9 @@ Run through **Firstmate native commands**:
 8. PR status → poller + digest link
 9. `fm-teardown` → clean teardown
 10. `bb fleet digest --tell-cos` → complete
-11. Kill process → liveness dead; ambiguous never respawns
-12. Fleet UI: tree, board, inbox, badges, chips, settings functional
+11. `bb fleet bearings --mate <homeId>` → CoS-ready snapshot
+12. Kill process → liveness dead; ambiguous never respawns
+13. Fleet UI: tree (mobile toggle), board, inbox, relaunch/detach controls functional
 
 ## 9. Out of scope (only these)
 
