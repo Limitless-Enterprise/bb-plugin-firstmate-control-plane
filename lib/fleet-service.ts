@@ -20,6 +20,7 @@ import {
   type MateDefaults,
 } from "./mate-defaults";
 import type {
+  Bearings,
   Digest,
   FleetNode,
   FsmState,
@@ -664,6 +665,57 @@ export class FleetService {
     this.publish();
   }
 
+  hasOpenHolds(homeId: string, threadId?: string): boolean {
+    this.assertHome(homeId);
+    return this.store.countOpenHolds(homeId, threadId) > 0;
+  }
+
+  buildBearings(homeId: string): Bearings {
+    const digest = this.buildDigest(homeId);
+    const home = this.store.getHome(homeId)!;
+    const wakes = this.store.listWakes(homeId, false);
+    const holds = this.store.listHolds(homeId, "open");
+    const prLinks: { label: string; url: string; threadId: string }[] = [];
+    for (const node of this.store.listNodes(homeId)) {
+      const entries = this.store.tailLedger(node.threadId, 80).reverse();
+      const pr = entries.find(
+        (entry) =>
+          entry.verb === "pr.opened" &&
+          typeof entry.detail?.url === "string",
+      );
+      if (pr && typeof pr.detail?.url === "string") {
+        prLinks.push({
+          label: node.label,
+          url: pr.detail.url,
+          threadId: node.threadId,
+        });
+      }
+    }
+    const lines = [
+      digest.summary,
+      holds.length
+        ? `Open holds (${holds.length}): ${holds.map((h) => h.title).join("; ")}`
+        : "Open holds: none",
+      wakes.length
+        ? `Unacked wakes (${wakes.length}): ${wakes.map((w) => w.reason).join("; ")}`
+        : "Unacked wakes: none",
+      prLinks.length
+        ? `PRs: ${prLinks.map((p) => `${p.label} → ${p.url}`).join(" · ")}`
+        : "PRs: none tracked",
+    ];
+    return {
+      homeId,
+      label: home.label,
+      generatedAtMs: Date.now(),
+      summary: lines.join("\n"),
+      lines,
+      digest,
+      openHolds: holds.length,
+      unackedWakes: wakes.length,
+      prLinks,
+    };
+  }
+
   buildDigest(homeId: string): Digest {
     this.assertHome(homeId);
     const home = this.store.getHome(homeId)!;
@@ -783,6 +835,93 @@ export class FleetService {
     this.publish();
   }
 
+  async relaunch(
+    homeId: string,
+    threadId: string,
+    prompt?: string,
+  ): Promise<FleetNode> {
+    this.assertHome(homeId);
+    const node = this.store.getNodeByThread(threadId);
+    if (!node || node.homeId !== homeId) {
+      throw new Error(`Unknown crew thread ${threadId} in home ${homeId}.`);
+    }
+    if (node.kind === "primary") {
+      throw new Error("Cannot relaunch the primary mate thread from Fleet.");
+    }
+    if (this.hasOpenHolds(homeId, threadId)) {
+      throw new Error("Cannot relaunch while open holds exist on this crew.");
+    }
+    const role = node.role ?? "ship";
+    const text =
+      prompt?.trim() ||
+      `Continue Firstmate task "${node.label}" on the existing worktree.`;
+    await this.bb.sdk.threads.stop({ threadId });
+    const home = this.store.getHome(homeId)!;
+    const mateThread = await this.bb.sdk.threads.get({
+      threadId: home.mateThreadId,
+    });
+    const profile = node.dispatchProfileId
+      ? this.store
+          .listProfiles(homeId)
+          .find((p) => p.id === node.dispatchProfileId)
+      : undefined;
+    const thread = await this.bb.sdk.threads.spawn({
+      projectId: mateThread.projectId,
+      parentThreadId: mateThread.id,
+      environment: await this.hostEnvironment({
+        type: "managed-worktree",
+        baseBranch: { kind: "default" },
+      }),
+      prompt: text,
+      title: `${role}: ${node.label}`,
+      ...(profile?.model ? { model: profile.model } : {}),
+      ...(profile?.providerId && profile.model
+        ? { providerId: profile.providerId }
+        : {}),
+      pluginMetadata: {
+        fleetHomeId: homeId,
+        fleetRole: role,
+        deliveryMode: node.deliveryMode,
+        yolo: node.yolo,
+        relaunchOf: threadId,
+      },
+    });
+    const updated =
+      this.store.updateNodeThread(node.id, thread.id, thread.environmentId ?? null) ??
+      node;
+    this.store.appendLedger({
+      homeId,
+      threadId: thread.id,
+      verb: "control.relaunch",
+      fsmState: "starting",
+      detail: { previousThreadId: threadId },
+    });
+    this.markThread(homeId, thread.id, "starting");
+    this.publish();
+    return updated;
+  }
+
+  async detachCrew(homeId: string, threadId: string): Promise<void> {
+    this.assertHome(homeId);
+    const node = this.store.getNodeByThread(threadId);
+    if (!node || node.homeId !== homeId) {
+      throw new Error(`Unknown crew thread ${threadId} in home ${homeId}.`);
+    }
+    if (node.kind === "primary") {
+      throw new Error("Cannot detach the primary mate thread.");
+    }
+    if (this.hasOpenHolds(homeId, threadId)) {
+      throw new Error("Cannot detach while open holds exist on this crew.");
+    }
+    try {
+      await this.bb.sdk.threads.stop({ threadId });
+    } catch {
+      // thread may already be stopped
+    }
+    this.store.deleteNode(node.id);
+    this.publish();
+  }
+
   async spawnCrew(input: {
     homeId: string;
     label: string;
@@ -828,7 +967,7 @@ export class FleetService {
         yolo: input.yolo ?? false,
       },
     });
-    return this.attachCrew({
+    const node = this.attachCrew({
       homeId: input.homeId,
       threadId: thread.id,
       label: input.label,
@@ -839,5 +978,24 @@ export class FleetService {
       dispatchProfileId: profile?.id ?? null,
       envId: thread.environmentId ?? null,
     });
+    return node;
+  }
+
+  async spawnCrewWithPaths(input: Parameters<FleetService["spawnCrew"]>[0]): Promise<
+    FleetNode & { worktreePath: string | null }
+  > {
+    const node = await this.spawnCrew(input);
+    let worktreePath: string | null = null;
+    if (node.envId) {
+      try {
+        const env = await this.bb.sdk.environments.get({
+          environmentId: node.envId,
+        });
+        worktreePath = env.path?.trim() || null;
+      } catch {
+        worktreePath = null;
+      }
+    }
+    return { ...node, worktreePath };
   }
 }

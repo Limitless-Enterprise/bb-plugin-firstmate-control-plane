@@ -195,6 +195,133 @@ function InboxList({
   );
 }
 
+function findNode(tree: TreeNode[], threadId: string): TreeNode | null {
+  for (const node of tree) {
+    if (node.threadId === threadId) return node;
+    const child = findNode(node.children, threadId);
+    if (child) return child;
+  }
+  return null;
+}
+
+function ThreadControls({
+  homeId,
+  node,
+  rpc,
+  onChanged,
+}: {
+  homeId: string;
+  node: TreeNode;
+  rpc: ReturnType<typeof useRpc<typeof rpcContract>>;
+  onChanged: () => void;
+}) {
+  const [steerText, setSteerText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async (action: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+      onChanged();
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex shrink-0 flex-col gap-2 border-b border-border px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <StatusDot fsmState={node.fsmState} liveness={node.liveness} />
+        <span className="font-medium text-foreground">{node.label}</span>
+        {node.role ? (
+          <span className="rounded bg-muted px-1.5 py-0.5 uppercase">{node.role}</span>
+        ) : null}
+        <span className="rounded bg-muted px-1.5 py-0.5">{node.deliveryMode}</span>
+        {node.yolo ? (
+          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-700 dark:text-amber-300">
+            yolo
+          </span>
+        ) : null}
+        {node.dispatchProfileId ? (
+          <span className="rounded bg-muted px-1.5 py-0.5">profile</span>
+        ) : null}
+      </div>
+      <form
+        className="flex gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const text = steerText.trim();
+          if (!text) return;
+          void run(async () => {
+            await rpc.call("steer", { homeId, threadId: node.threadId, text });
+            setSteerText("");
+          });
+        }}
+      >
+        <input
+          className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          placeholder="Steer this thread…"
+          value={steerText}
+          onChange={(event) => setSteerText(event.target.value)}
+          disabled={busy}
+        />
+        <Button type="submit" size="sm" disabled={busy || !steerText.trim()}>
+          Steer
+        </Button>
+      </form>
+      {node.kind !== "primary" ? (
+        <div className="flex flex-wrap gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() =>
+              void run(() => rpc.call("interrupt", { homeId, threadId: node.threadId }))
+            }
+          >
+            Interrupt
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() =>
+              void run(() => rpc.call("exitThread", { homeId, threadId: node.threadId }))
+            }
+          >
+            Exit
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() =>
+              void run(() => rpc.call("relaunch", { homeId, threadId: node.threadId }))
+            }
+          >
+            Relaunch
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={() =>
+              void run(() => rpc.call("detachCrew", { homeId, threadId: node.threadId }))
+            }
+          >
+            Detach
+          </Button>
+        </div>
+      ) : null}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    </div>
+  );
+}
+
 function FleetPage({ subPath }: { subPath?: string }) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
@@ -206,6 +333,7 @@ function FleetPage({ subPath }: { subPath?: string }) {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("fleet");
   const [error, setError] = useState<string | null>(null);
+  const [treeOpen, setTreeOpen] = useState(false);
 
   const refetch = useCallback(() => {
     rpc
@@ -271,8 +399,14 @@ function FleetPage({ subPath }: { subPath?: string }) {
   const selectThread = (threadId: string) => {
     setSelectedThreadId(threadId);
     setTab("fleet");
+    setTreeOpen(false);
     navigate.toPluginPanel("fleet", { subPath: `thread/${threadId}` });
   };
+
+  const selectedNode = useMemo(
+    () => (selectedThreadId ? findNode(tree, selectedThreadId) : null),
+    [tree, selectedThreadId],
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -369,8 +503,14 @@ function FleetPage({ subPath }: { subPath?: string }) {
           ))}
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[240px_minmax(0,1fr)]">
-          <aside className="min-h-0 overflow-y-auto border-r border-border p-2">
+        <div className="grid min-h-0 flex-1 md:grid-cols-[240px_minmax(0,1fr)]">
+          <aside
+            className={cn(
+              "min-h-0 overflow-y-auto border-r border-border p-2",
+              "max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-20 max-md:w-[min(280px,85vw)] max-md:bg-background max-md:shadow-lg",
+              !treeOpen && "max-md:hidden",
+            )}
+          >
             {tree.length === 0 ? (
               <p className="px-2 py-4 text-sm text-muted-foreground">
                 No crews yet. Spawn ship or scout crews from the mate thread.
@@ -386,20 +526,39 @@ function FleetPage({ subPath }: { subPath?: string }) {
               ))
             )}
           </aside>
-          <main className="min-h-0">
-            {selectedThreadId ? (
-              <ThreadChat
-                threadId={selectedThreadId}
-                variant="compact"
-                layout="contained"
-                permissionPolicy="editable"
-                className="h-full min-h-0"
+          <main className="flex min-h-0 flex-col">
+            <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1 md:hidden">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setTreeOpen((open) => !open)}
+              >
+                {treeOpen ? "Hide tree" : "Show tree"}
+              </Button>
+            </div>
+            {selectedNode && selectedHomeId ? (
+              <ThreadControls
+                homeId={selectedHomeId}
+                node={selectedNode}
+                rpc={rpc}
+                onChanged={() => refetchHome(selectedHomeId)}
               />
-            ) : (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Select a mate or crew to open chat.
-              </div>
-            )}
+            ) : null}
+            <div className="min-h-0 flex-1">
+              {selectedThreadId ? (
+                <ThreadChat
+                  threadId={selectedThreadId}
+                  variant="compact"
+                  layout="contained"
+                  permissionPolicy="editable"
+                  className="h-full min-h-0"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  Select a mate or crew to open chat.
+                </div>
+              )}
+            </div>
           </main>
         </div>
       )}

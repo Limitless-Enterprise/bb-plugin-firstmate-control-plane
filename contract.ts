@@ -2,6 +2,7 @@ import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import {
   digestSchema,
+  bearingsSchema,
   holdSchema,
   homeSchema,
   inboxItemSchema,
@@ -223,6 +224,18 @@ export const rpcContract = defineRpcContract({
     input: z.object({ homeId: z.string(), threadId: z.string() }),
     output: z.null(),
   },
+  relaunch: {
+    input: z.object({
+      homeId: z.string(),
+      threadId: z.string(),
+      prompt: z.string().optional(),
+    }),
+    output: nodeSchema,
+  },
+  detachCrew: {
+    input: z.object({ homeId: z.string(), threadId: z.string() }),
+    output: z.null(),
+  },
   listProfiles: {
     input: z.object({ homeId: z.string() }),
     output: z.object({ profiles: z.array(profileSchema) }),
@@ -306,6 +319,10 @@ export const rpcContract = defineRpcContract({
   digest: {
     input: z.object({ homeId: z.string() }),
     output: digestSchema,
+  },
+  bearings: {
+    input: z.object({ homeId: z.string() }),
+    output: bearingsSchema,
   },
   status: {
     input: z.object({ homeId: z.string().optional() }),

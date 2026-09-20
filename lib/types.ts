@@ -95,7 +95,7 @@ export const inboxItemSchema = z.object({
   homeId: z.string(),
   holdId: z.string().nullable(),
   threadId: z.string(),
-  kind: z.enum(["hold", "wake", "liveness", "stall"]),
+  kind: z.enum(["hold", "wake", "liveness", "stall", "pr"]),
   urgency: z.enum(urgencies),
   title: z.string(),
   body: z.string(),
@@ -150,6 +150,24 @@ export const digestSchema = z.object({
   openHolds: z.number(),
 });
 
+export const bearingsSchema = z.object({
+  homeId: z.string(),
+  label: z.string(),
+  generatedAtMs: z.number(),
+  summary: z.string(),
+  lines: z.array(z.string()),
+  digest: digestSchema,
+  openHolds: z.number(),
+  unackedWakes: z.number(),
+  prLinks: z.array(
+    z.object({
+      label: z.string(),
+      url: z.string(),
+      threadId: z.string(),
+    }),
+  ),
+});
+
 export type Home = z.infer<typeof homeSchema>;
 export type FleetNode = z.infer<typeof nodeSchema>;
 export type DispatchProfile = z.infer<typeof profileSchema>;
@@ -157,3 +175,4 @@ export type InboxItem = z.infer<typeof inboxItemSchema>;
 export type Hold = z.infer<typeof holdSchema>;
 export type Wake = z.infer<typeof wakeSchema>;
 export type Digest = z.infer<typeof digestSchema>;
+export type Bearings = z.infer<typeof bearingsSchema>;

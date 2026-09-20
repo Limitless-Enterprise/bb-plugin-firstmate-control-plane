@@ -7,13 +7,13 @@ import { pathExists, pathIsGitCheckout } from "./firstmate-checkout";
 
 const execFileAsync = promisify(execFile);
 
-export const INTEGRATION_VERSION = 1;
+export const INTEGRATION_VERSION = 2;
 
 const PLUGIN_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
-const INTEGRATION_SOURCE = path.join(PLUGIN_ROOT, "integration");
+const OVERLAY_SOURCE = path.join(PLUGIN_ROOT, "packages", "bb-backend", "overlay");
 
 export type BbIntegrationConfig = {
   enabled: boolean;
@@ -37,23 +37,52 @@ export type ApplyIntegrationResult = {
   configPath: string;
 };
 
+const OVERLAY_FILES = [
+  "bin/fm-bb-lib.sh",
+  "bin/fm-bb-spawn.sh",
+  "bin/fm-spawn-wrap.sh",
+  "bin/fm-backend-wrap.sh",
+  "bin/backends/bb.sh",
+] as const;
+
 async function copyFileExecutable(src: string, dest: string): Promise<void> {
   await fs.mkdir(path.dirname(dest), { recursive: true });
   await fs.copyFile(src, dest);
   await fs.chmod(dest, 0o755);
 }
 
-async function copyTree(
-  sourceDir: string,
-  targetDir: string,
-  files: string[],
+async function backupNativeFile(
+  checkoutPath: string,
+  relativePath: string,
 ): Promise<void> {
-  for (const relative of files) {
-    await copyFileExecutable(
-      path.join(sourceDir, relative),
-      path.join(targetDir, relative),
+  const livePath = path.join(checkoutPath, relativePath);
+  const nativePath = path.join(
+    checkoutPath,
+    ".bb-integration",
+    "native",
+    relativePath,
+  );
+  if (await pathExists(nativePath)) return;
+
+  const marker = path.join(checkoutPath, ".bb-integration", "manifest.json");
+  if (await pathExists(marker)) {
+    throw new Error(
+      `Integration manifest exists but native backup is missing at ${nativePath}`,
     );
   }
+
+  if (!(await pathExists(livePath))) {
+    throw new Error(`Firstmate checkout missing ${relativePath}: ${checkoutPath}`);
+  }
+
+  const current = await fs.readFile(livePath, "utf8");
+  if (current.includes("firstmate-control-plane BB integration")) {
+    throw new Error(
+      `Cannot bootstrap BB integration: ${relativePath} is already a BB wrapper without a native backup.`,
+    );
+  }
+
+  await copyFileExecutable(livePath, nativePath);
 }
 
 async function ensureGitExclude(
@@ -67,10 +96,7 @@ async function ensureGitExclude(
   } catch {
     return;
   }
-  if (!gitStat.isDirectory()) {
-    // Worktrees use a .git file; exclude patterns live in the main repo only.
-    return;
-  }
+  if (!gitStat.isDirectory()) return;
   const excludePath = path.join(gitPath, "info", "exclude");
   let existing = "";
   try {
@@ -87,43 +113,15 @@ async function ensureGitExclude(
   await fs.appendFile(excludePath, suffix, "utf8");
 }
 
-async function installSpawnStub(checkoutPath: string): Promise<void> {
-  const stubPath = path.join(checkoutPath, "bin", "fm-spawn.sh");
-  const stub = `#!/usr/bin/env bash
-# Managed by firstmate-control-plane BB integration. Do not edit.
-set -eu
-FM_ROOT="$(cd "$(dirname "\${BASH_SOURCE[0]}")/.." && pwd)"
-exec "$FM_ROOT/.bb-integration/bin/fm-spawn.sh" "$@"
-`;
-  await fs.writeFile(stubPath, stub, { mode: 0o755 });
-}
-
-async function backupNativeSpawn(checkoutPath: string): Promise<void> {
-  const liveSpawn = path.join(checkoutPath, "bin", "fm-spawn.sh");
-  const nativeSpawn = path.join(
-    checkoutPath,
-    ".bb-integration",
-    "native",
-    "bin",
-    "fm-spawn.sh",
+async function installWrapper(
+  checkoutPath: string,
+  overlayRelative: string,
+  targetRelative: string,
+): Promise<void> {
+  await copyFileExecutable(
+    path.join(OVERLAY_SOURCE, overlayRelative),
+    path.join(checkoutPath, targetRelative),
   );
-  if (await pathExists(nativeSpawn)) return;
-
-  const marker = path.join(checkoutPath, ".bb-integration", "manifest.json");
-  if (await pathExists(marker)) {
-    throw new Error(
-      `Integration manifest exists but native fm-spawn backup is missing at ${nativeSpawn}`,
-    );
-  }
-
-  const current = await fs.readFile(liveSpawn, "utf8");
-  if (current.includes("firstmate-control-plane BB integration")) {
-    throw new Error(
-      "Cannot bootstrap BB integration: bin/fm-spawn.sh is already a BB stub without a native backup.",
-    );
-  }
-
-  await copyFileExecutable(liveSpawn, nativeSpawn);
 }
 
 export async function applyFirstmateIntegration(
@@ -142,28 +140,37 @@ export async function applyFirstmateIntegration(
     throw new Error(`Checkout path is not a git repository: ${checkoutPath}`);
   }
 
-  const spawnPath = path.join(checkoutPath, "bin", "fm-spawn.sh");
-  if (!(await pathExists(spawnPath))) {
-    throw new Error(`Firstmate checkout missing bin/fm-spawn.sh: ${checkoutPath}`);
-  }
-
-  await backupNativeSpawn(checkoutPath);
+  await backupNativeFile(checkoutPath, "bin/fm-spawn.sh");
+  await backupNativeFile(checkoutPath, "bin/fm-backend.sh");
 
   const integrationRoot = path.join(checkoutPath, ".bb-integration");
-  await copyTree(INTEGRATION_SOURCE, integrationRoot, [
-    "bin/fm-bb-lib.sh",
-    "bin/fm-bb-spawn.sh",
-    "bin/fm-spawn.sh",
-  ]);
+  for (const relative of OVERLAY_FILES) {
+    await copyFileExecutable(
+      path.join(OVERLAY_SOURCE, relative),
+      path.join(integrationRoot, relative),
+    );
+  }
+
+  await installWrapper(checkoutPath, "bin/fm-spawn-wrap.sh", "bin/fm-spawn.sh");
+  await installWrapper(
+    checkoutPath,
+    "bin/fm-backend-wrap.sh",
+    "bin/fm-backend.sh",
+  );
+  await installWrapper(
+    checkoutPath,
+    "bin/backends/bb.sh",
+    "bin/backends/bb.sh",
+  );
 
   const docsDir = path.join(checkoutPath, "docs", "bb-integration");
   await fs.mkdir(docsDir, { recursive: true });
   await fs.copyFile(
-    path.join(INTEGRATION_SOURCE, "AGENTS.bb.md"),
+    path.join(OVERLAY_SOURCE, "AGENTS.bb.md"),
     path.join(docsDir, "AGENTS.bb.md"),
   );
   await fs.copyFile(
-    path.join(INTEGRATION_SOURCE, "README.md"),
+    path.join(OVERLAY_SOURCE, "README.md"),
     path.join(docsDir, "README.md"),
   );
 
@@ -178,6 +185,7 @@ export async function applyFirstmateIntegration(
   await fs.mkdir(configDir, { recursive: true });
   const configPath = path.join(configDir, "bb-integration.json");
   await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+  await fs.writeFile(path.join(configDir, "backend"), "bb\n", "utf8");
 
   const manifest = {
     integrationVersion: INTEGRATION_VERSION,
@@ -192,15 +200,15 @@ export async function applyFirstmateIntegration(
     "utf8",
   );
 
-  await installSpawnStub(checkoutPath);
   await ensureGitExclude(checkoutPath, [
     ".bb-integration/",
     "config/bb-integration.json",
+    "config/backend",
     "docs/bb-integration/",
   ]);
 
   input.log?.info(
-    `fleet: applied BB integration v${INTEGRATION_VERSION} to ${checkoutPath} (home=${homeId})`,
+    `fleet: applied BB integration v${INTEGRATION_VERSION} to ${checkoutPath} (home=${homeId}, backend=bb)`,
   );
 
   return {
@@ -220,11 +228,10 @@ export function matePromptWithBbIntegration(input: {
     "",
     "## BB Fleet integration",
     "",
-    "This checkout includes the BB integration overlay (see docs/bb-integration/AGENTS.bb.md).",
-    "Dispatch crews with bin/fm-spawn.sh as usual — when BB integration is enabled,",
-    "crews are registered in the Fleet UI automatically via bb fleet spawn.",
-    "Use bb fleet tree / bb fleet inbox to inspect crews; do not claim a worker is",
-    "running unless it appears in the fleet tree or you have a bb thread id.",
+    "This checkout uses config/backend=bb (see docs/bb-integration/AGENTS.bb.md).",
+    "Dispatch crews with bin/fm-spawn.sh as usual — ship/scout crews register in Fleet automatically.",
+    "Use bb fleet tree / bb fleet inbox to inspect crews; do not claim a worker is running",
+    "unless it appears in the fleet tree or you have a bb thread id in state/<task>.meta.",
   ].join("\n");
 }
 
@@ -243,10 +250,13 @@ export async function runIntegrationSelfCheck(
   const issues: string[] = [];
   const root = checkoutPath.trim();
   const required = [
-    ".bb-integration/bin/fm-spawn.sh",
     ".bb-integration/bin/fm-bb-spawn.sh",
+    ".bb-integration/bin/backends/bb.sh",
     ".bb-integration/native/bin/fm-spawn.sh",
+    ".bb-integration/native/bin/fm-backend.sh",
+    "bin/backends/bb.sh",
     "config/bb-integration.json",
+    "config/backend",
     "docs/bb-integration/AGENTS.bb.md",
   ];
   for (const relative of required) {
@@ -254,16 +264,18 @@ export async function runIntegrationSelfCheck(
       issues.push(`missing ${relative}`);
     }
   }
-  const stub = await fs.readFile(path.join(root, "bin", "fm-spawn.sh"), "utf8");
-  if (!stub.includes("firstmate-control-plane BB integration")) {
-    issues.push("bin/fm-spawn.sh is not the BB integration stub");
+  try {
+    const backend = await fs.readFile(path.join(root, "config/backend"), "utf8");
+    if (backend.trim() !== "bb") {
+      issues.push("config/backend is not set to bb");
+    }
+  } catch {
+    issues.push("config/backend unreadable");
   }
   try {
-    await execFileAsync("bash", [
-      path.join(root, ".bb-integration/bin/fm-bb-lib.sh"),
-    ]);
+    await execFileAsync("bash", ["-n", path.join(root, "bin/backends/bb.sh")]);
   } catch {
-    // sourcing-only script; ignore
+    issues.push("bin/backends/bb.sh has bash syntax errors");
   }
   return { ok: issues.length === 0, issues };
 }

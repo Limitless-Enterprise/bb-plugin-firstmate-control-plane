@@ -3,8 +3,22 @@ import { rpcContract } from "./contract";
 import { FleetStore, migrations } from "./lib/db";
 import { FLEET_CHANGED, FleetService } from "./lib/fleet-service";
 import { projectFsm } from "./lib/fsm";
+import { createStatusBridge } from "./lib/status-bridge";
+import { createPrPoller } from "./lib/pr-poller";
 
 export type { rpcContract };
+
+type KvLike = {
+  get<T>(key: string): Promise<T | null | undefined>;
+  set(key: string, value: unknown): Promise<void>;
+};
+
+function kvAdapter(kv: KvLike) {
+  return {
+    get: async <T>(key: string) => (await kv.get<T>(key)) ?? null,
+    set: (key: string, value: unknown) => kv.set(key, value),
+  };
+}
 
 function parseCliFlags(argv: string[]): {
   positional: string[];
@@ -82,6 +96,12 @@ export default async function plugin(bb: BbPluginApi) {
   };
 
   const fleet = new FleetService(bb, store, await getFleetConfig());
+  const statusBridge = await createStatusBridge(
+    store,
+    fleet,
+    kvAdapter(bb.storage.kv),
+  );
+  const prPoller = await createPrPoller(store, fleet, kvAdapter(bb.storage.kv));
 
   const getConfig = async () => {
     const values = await settings.get();
@@ -170,6 +190,11 @@ export default async function plugin(bb: BbPluginApi) {
       await fleet.exitThread(input.homeId, input.threadId);
       return null;
     },
+    relaunch: async (input) => fleet.relaunch(input.homeId, input.threadId, input.prompt),
+    detachCrew: async (input) => {
+      await fleet.detachCrew(input.homeId, input.threadId);
+      return null;
+    },
     listProfiles: (input) => ({
       profiles: store.listProfiles(input.homeId),
     }),
@@ -230,6 +255,7 @@ export default async function plugin(bb: BbPluginApi) {
       return { results };
     },
     digest: (input) => fleet.buildDigest(input.homeId),
+    bearings: (input) => fleet.buildBearings(input.homeId),
     status: (input) => {
       const homeId = input.homeId ?? store.getSelectedHomeId();
       const homes = store.listHomes();
@@ -291,6 +317,56 @@ export default async function plugin(bb: BbPluginApi) {
       body: `Thread ${threadId} failed a turn.`,
     });
     fleet.publish();
+  });
+
+  bb.background.service("fleet-status-bridge", {
+    async start(signal) {
+      while (!signal.aborted) {
+        for (const home of store.listHomes()) {
+          try {
+            await statusBridge.scanHome(home.homeId, home.checkoutPath);
+          } catch (error) {
+            bb.log.warn(`fleet: status bridge scan failed for ${home.homeId}: ${error}`);
+          }
+        }
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, 15_000);
+          signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            { once: true },
+          );
+        });
+      }
+    },
+  });
+
+  bb.background.service("fleet-pr-poller", {
+    async start(signal) {
+      while (!signal.aborted) {
+        for (const home of store.listHomes()) {
+          try {
+            await prPoller.pollHome(home.homeId);
+          } catch (error) {
+            bb.log.warn(`fleet: PR poller failed for ${home.homeId}: ${error}`);
+          }
+        }
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, 120_000);
+          signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            { once: true },
+          );
+        });
+      }
+    },
   });
 
   bb.background.service("fleet-supervisor", {
@@ -368,7 +444,8 @@ export default async function plugin(bb: BbPluginApi) {
     "  bb fleet spawn --mate <homeId> --role ship|scout --label <name> --prompt <text>",
     "  bb fleet mark --mate <homeId> --thread <id> --state <fsm>",
     "  bb fleet steer --mate <homeId> --thread <id> --text <message>",
-    "  bb fleet interrupt|exit --mate <homeId> --thread <id>",
+    "  bb fleet interrupt|exit|relaunch|detach --mate <homeId> --thread <id>",
+    "  bb fleet bearings [--mate <homeId>] [--json]",
     "  bb fleet hold open|resolve ...",
     "  bb fleet inbox [--mate <homeId>] [--json]",
     "  bb fleet inbox snooze|resolve <id> [--mate <homeId>]",
@@ -393,10 +470,13 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "steer", summary: "Data-plane steer", usage: "bb fleet steer ..." },
       { name: "interrupt", summary: "Interrupt thread", usage: "bb fleet interrupt ..." },
       { name: "exit", summary: "Exit thread", usage: "bb fleet exit ..." },
+      { name: "relaunch", summary: "Relaunch crew thread", usage: "bb fleet relaunch ..." },
+      { name: "detach", summary: "Detach crew from registry", usage: "bb fleet detach ..." },
       { name: "hold", summary: "Holds", usage: "bb fleet hold ..." },
       { name: "inbox", summary: "Fleet inbox", usage: "bb fleet inbox ..." },
       { name: "probe", summary: "Liveness probe", usage: "bb fleet probe ..." },
       { name: "digest", summary: "CoS digest", usage: "bb fleet digest ..." },
+      { name: "bearings", summary: "Fleet bearings", usage: "bb fleet bearings ..." },
       { name: "profiles", summary: "Dispatch profiles", usage: "bb fleet profiles ..." },
       { name: "integration", summary: "Firstmate BB overlay", usage: "bb fleet integration ..." },
     ],
@@ -549,6 +629,8 @@ export default async function plugin(bb: BbPluginApi) {
             const label = flags.get("label");
             const role = flags.get("role");
             const prompt = flags.get("prompt");
+            const modeFlag = flags.get("mode");
+            const profileFlag = flags.get("profile");
             if (
               typeof label !== "string" ||
               (role !== "ship" && role !== "scout") ||
@@ -556,13 +638,34 @@ export default async function plugin(bb: BbPluginApi) {
             ) {
               return { exitCode: 1, stderr: "Missing --label --role --prompt" };
             }
-            const node = await fleet.spawnCrew({
+            const deliveryMode =
+              modeFlag === "no-mistakes" ||
+              modeFlag === "direct-PR" ||
+              modeFlag === "local-only"
+                ? modeFlag
+                : undefined;
+            const node = await fleet.spawnCrewWithPaths({
               homeId: homeId(),
               label,
               role,
               prompt,
+              deliveryMode,
+              yolo: flags.has("yolo"),
+              profileId:
+                typeof profileFlag === "string" ? profileFlag : undefined,
             });
-            return reply(node, `Spawned ${role} ${node.threadId}`);
+            const payload = {
+              ...node,
+              threadId: node.threadId,
+              envId: node.envId,
+              environmentId: node.envId,
+              worktreePath: node.worktreePath,
+              checkoutPath: node.worktreePath,
+            };
+            return reply(
+              payload,
+              `Spawned ${role} ${node.threadId}${node.worktreePath ? ` @ ${node.worktreePath}` : ""}`,
+            );
           }
           case "mark": {
             const thread = flags.get("thread");
@@ -583,13 +686,26 @@ export default async function plugin(bb: BbPluginApi) {
             return reply(null, `Steered ${thread}`);
           }
           case "interrupt":
-          case "exit": {
+          case "exit":
+          case "relaunch":
+          case "detach": {
             const thread = flags.get("thread");
             if (typeof thread !== "string") {
               return { exitCode: 1, stderr: "Missing --thread" };
             }
-            if (command === "interrupt") await fleet.interrupt(homeId(), thread);
-            else await fleet.exitThread(homeId(), thread);
+            const id = homeId();
+            if (command === "interrupt") await fleet.interrupt(id, thread);
+            else if (command === "exit") await fleet.exitThread(id, thread);
+            else if (command === "relaunch") {
+              const prompt =
+                typeof flags.get("prompt") === "string"
+                  ? String(flags.get("prompt"))
+                  : undefined;
+              const node = await fleet.relaunch(id, thread, prompt);
+              return reply(node, `Relaunched ${node.label} as ${node.threadId}`);
+            } else {
+              await fleet.detachCrew(id, thread);
+            }
             return reply(null, `${command} ${thread}`);
           }
           case "hold": {
@@ -691,8 +807,67 @@ export default async function plugin(bb: BbPluginApi) {
             }
             return reply(digest, digest.summary);
           }
+          case "bearings": {
+            const id = homeId();
+            const bearings = fleet.buildBearings(id);
+            if (flags.has("tell-cos")) {
+              const config = await getConfig();
+              if (config.cosThreadId) {
+                await bb.sdk.threads.send({
+                  threadId: config.cosThreadId,
+                  mode: "auto",
+                  input: [
+                    {
+                      type: "text",
+                      text: bearings.summary,
+                      mentions: [],
+                    },
+                  ],
+                });
+              }
+            }
+            return reply(bearings, bearings.summary);
+          }
           case "profiles": {
-            const profiles = store.listProfiles(homeId());
+            const id = homeId();
+            if (sub === "add" || sub === "upsert") {
+              const label = flags.get("label");
+              if (typeof label !== "string") {
+                return { exitCode: 1, stderr: "Missing --label" };
+              }
+              const profile = store.upsertProfile({
+                id: typeof flags.get("id") === "string" ? String(flags.get("id")) : undefined,
+                homeId: id,
+                label,
+                providerId:
+                  typeof flags.get("provider") === "string"
+                    ? String(flags.get("provider"))
+                    : null,
+                model:
+                  typeof flags.get("model") === "string"
+                    ? String(flags.get("model"))
+                    : null,
+                effort:
+                  typeof flags.get("effort") === "string"
+                    ? String(flags.get("effort"))
+                    : null,
+                taskClasses: [],
+              });
+              fleet.publish();
+              return reply(profile, `Profile ${profile.id}`);
+            }
+            if (sub === "delete" || sub === "rm") {
+              const profileId = rest[0];
+              if (!profileId) {
+                return { exitCode: 1, stderr: "Usage: bb fleet profiles delete <id>" };
+              }
+              if (!store.deleteProfile(id, profileId)) {
+                return { exitCode: 1, stderr: `Unknown profile ${profileId}` };
+              }
+              fleet.publish();
+              return reply(null, `Deleted profile ${profileId}`);
+            }
+            const profiles = store.listProfiles(id);
             return reply(
               profiles,
               profiles.map((p) => `${p.id}\t${p.label}`).join("\n") || "No profiles.",

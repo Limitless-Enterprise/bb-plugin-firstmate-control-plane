@@ -1,0 +1,29 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { projectFsm } from "./fsm";
+
+describe("projectFsm", () => {
+  it("keeps working through native idle until done", () => {
+    const state = projectFsm([
+      { verb: "crew.working", fsmState: "working" },
+      { verb: "turn.end", fsmState: "idle" },
+    ]);
+    assert.equal(state, "working");
+  });
+
+  it("transitions to done on crew.done", () => {
+    const state = projectFsm([
+      { verb: "crew.working", fsmState: "working" },
+      { verb: "crew.done", fsmState: "done" },
+    ]);
+    assert.equal(state, "done");
+  });
+
+  it("blocked beats later idle", () => {
+    const state = projectFsm([
+      { verb: "crew.blocked", fsmState: "blocked" },
+      { verb: "turn.end", fsmState: "idle" },
+    ]);
+    assert.equal(state, "blocked");
+  });
+});

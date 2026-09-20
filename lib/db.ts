@@ -340,6 +340,44 @@ export class FleetStore {
     this.db.prepare("DELETE FROM nodes WHERE id = ?").run(id);
   }
 
+  updateNodeThread(
+    id: string,
+    threadId: string,
+    envId: string | null,
+  ): FleetNode | undefined {
+    this.db
+      .prepare(
+        `UPDATE nodes SET thread_id = ?, env_id = ? WHERE id = ?`,
+      )
+      .run(threadId, envId, id);
+    return this.getNode(id);
+  }
+
+  countOpenHolds(homeId: string, threadId?: string): number {
+    if (threadId) {
+      const row = this.db
+        .prepare(
+          `SELECT COUNT(*) AS count FROM holds
+           WHERE home_id = ? AND thread_id = ? AND state = 'open'`,
+        )
+        .get(homeId, threadId) as { count: number };
+      return row.count;
+    }
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM holds WHERE home_id = ? AND state = 'open'`,
+      )
+      .get(homeId) as { count: number };
+    return row.count;
+  }
+
+  deleteProfile(homeId: string, profileId: string): boolean {
+    const result = this.db
+      .prepare(`DELETE FROM dispatch_profiles WHERE home_id = ? AND id = ?`)
+      .run(homeId, profileId);
+    return result.changes > 0;
+  }
+
   upsertProfile(
     input: Omit<DispatchProfile, "id"> & { id?: string },
   ): DispatchProfile {
