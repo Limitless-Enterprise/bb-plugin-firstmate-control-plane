@@ -1,8 +1,8 @@
 # Per-repo no-mistakes overrides for the Fleet control-plane plugin.
 
 commands:
-  test: pnpm test
-  lint: pnpm run typecheck
+  test: pnpm install --frozen-lockfile && pnpm test
+  lint: pnpm install --frozen-lockfile && pnpm run typecheck
 
 document:
   instructions: |
