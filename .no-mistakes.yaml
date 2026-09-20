@@ -2,7 +2,12 @@
 
 commands:
   test: pnpm install --frozen-lockfile && pnpm test
-  lint: pnpm install --frozen-lockfile && pnpm run typecheck
+  lint: pnpm install --frozen-lockfile && pnpm run typecheck && pnpm run build
+
+test:
+  evidence:
+    attach_media: false
+    store_in_repo: false
 
 document:
   instructions: |
