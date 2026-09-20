@@ -5,8 +5,8 @@ set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_BB_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-# shellcheck source=fm-bb-lib.sh
-. "$SCRIPT_DIR/fm-bb-lib.sh"
+# shellcheck source=/dev/null
+. "$FM_BB_ROOT/.bb-integration/bin/fm-bb-lib.sh"
 
 NATIVE="$FM_BB_ROOT/.bb-integration/native/bin/fm-spawn.sh"
 BB_SPAWN="$FM_BB_ROOT/.bb-integration/bin/fm-bb-spawn.sh"

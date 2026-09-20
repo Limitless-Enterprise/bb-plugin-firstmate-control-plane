@@ -22,7 +22,22 @@ export class StatusBridge {
     private readonly writeCursor: (next: BridgeCursor) => Promise<void>,
   ) {}
 
-  async scanHome(homeId: string, checkoutPath: string): Promise<number> {
+  async scanMateHome(
+    homeId: string,
+    checkoutPaths: string[],
+  ): Promise<number> {
+    await this.fleet.syncCrewsFromStateMeta(homeId, checkoutPaths);
+    let ingested = 0;
+    for (const checkoutPath of checkoutPaths) {
+      ingested += await this.scanCheckoutPath(homeId, checkoutPath);
+    }
+    return ingested;
+  }
+
+  private async scanCheckoutPath(
+    homeId: string,
+    checkoutPath: string,
+  ): Promise<number> {
     const stateDir = path.join(checkoutPath, "state");
     let entries: string[];
     try {
@@ -58,7 +73,7 @@ export class StatusBridge {
         continue;
       }
 
-      const threadId = await this.resolveThreadId(checkoutPath, taskId);
+      const threadId = await this.resolveThreadId(homeId, checkoutPath, taskId);
       if (!threadId) {
         advanceCursor();
         continue;
@@ -138,16 +153,15 @@ export class StatusBridge {
   }
 
   private async resolveThreadId(
+    homeId: string,
     checkoutPath: string,
     taskId: string,
   ): Promise<string | null> {
-    for (const home of this.store.listHomes()) {
-      if (home.checkoutPath !== checkoutPath) continue;
-      const match = this.store
-        .listNodes(home.homeId)
-        .find((n) => n.label === taskId);
-      if (match) return match.threadId;
-    }
+    const match = this.store
+      .listNodes(homeId)
+      .find((node) => node.label === taskId);
+    if (match) return match.threadId;
+
     const metaPath = path.join(checkoutPath, "state", `${taskId}.meta`);
     try {
       const meta = await fs.readFile(metaPath, "utf8");

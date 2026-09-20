@@ -1,7 +1,7 @@
 import { type BbPluginApi } from "@get-bb/plugin-sdk";
 import { rpcContract } from "./contract";
 import { FleetStore, migrations } from "./lib/db";
-import { FLEET_CHANGED, FleetService } from "./lib/fleet-service";
+import { FLEET_CHANGED, FleetService, isLegacyFleetThreadId } from "./lib/fleet-service";
 import { projectFsm } from "./lib/fsm";
 import { createStatusBridge } from "./lib/status-bridge";
 import { createPrPoller } from "./lib/pr-poller";
@@ -324,7 +324,8 @@ export default async function plugin(bb: BbPluginApi) {
       while (!signal.aborted) {
         for (const home of store.listHomes()) {
           try {
-            await statusBridge.scanHome(home.homeId, home.checkoutPath);
+            const checkoutPaths = await fleet.mateCheckoutPaths(home.homeId);
+            await statusBridge.scanMateHome(home.homeId, checkoutPaths);
           } catch (error) {
             bb.log.warn(`fleet: status bridge scan failed for ${home.homeId}: ${error}`);
           }
@@ -377,6 +378,7 @@ export default async function plugin(bb: BbPluginApi) {
         for (const home of homes) {
           const nodes = store.listNodes(home.homeId);
           for (const node of nodes) {
+            if (isLegacyFleetThreadId(node.threadId)) continue;
             const verdict = await fleet.probeThread(node.threadId);
             if (verdict === "dead" || verdict === "missing") {
               store.createInboxItem({

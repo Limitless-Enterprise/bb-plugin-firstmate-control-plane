@@ -17,6 +17,16 @@ import {
   pathIsGitCheckout,
 } from "./firstmate-checkout";
 import {
+  mateEnvironmentPath,
+  resolveMateCheckoutPaths,
+  resolveMateStateRoot,
+} from "./mate-checkout-paths";
+import {
+  fsmFromStatusPrefix,
+  ledgerVerbFromStatus,
+  parseStatusLine,
+} from "./status-verbs";
+import {
   MATE_DEFAULTS_KV_KEY,
   normalizeMateDefaults,
   type MateDefaults,
@@ -30,24 +40,20 @@ import type {
   TreeNode,
 } from "./types";
 
-async function mateEnvironmentPath(
-  bb: BbPluginApi,
-  mateThreadId: string,
-): Promise<string | null> {
-  try {
-    const thread = await bb.sdk.threads.get({ threadId: mateThreadId });
-    if (!thread.environmentId) return null;
-    const environment = await bb.sdk.environments.get({
-      environmentId: thread.environmentId,
-    });
-    const path = environment.path?.trim();
-    return path || null;
-  } catch {
-    return null;
-  }
+export const FLEET_CHANGED = "fleet-changed";
+
+function metaField(meta: string, key: string): string | null {
+  const match = meta.match(new RegExp(`^${key}=(.+)$`, "m"));
+  return match?.[1]?.trim() ?? null;
 }
 
-export const FLEET_CHANGED = "fleet-changed";
+function legacyThreadId(homeId: string, taskId: string): string {
+  return `legacy:${homeId}:${taskId}`;
+}
+
+export function isLegacyFleetThreadId(threadId: string): boolean {
+  return threadId.startsWith("legacy:");
+}
 
 export type FleetConfig = {
   firstmateRepoUrl: string;
@@ -110,15 +116,29 @@ export class FleetService {
     return result;
   }
 
+  async mateCheckoutPaths(homeId: string): Promise<string[]> {
+    const home = this.store.getHome(homeId);
+    if (!home) return [];
+    return resolveMateCheckoutPaths(this.bb, home);
+  }
+
+  async mateStateRoot(homeId: string): Promise<string | null> {
+    const home = this.store.getHome(homeId);
+    if (!home) return null;
+    return resolveMateStateRoot(this.bb, home);
+  }
+
   async ensureBbIntegration(input: {
     homeId: string;
     mateThreadId: string;
     checkoutPath: string;
   }) {
-    const checkoutPaths = new Set<string>();
-    checkoutPaths.add(input.checkoutPath.trim());
-    const envPath = await mateEnvironmentPath(this.bb, input.mateThreadId);
-    if (envPath) checkoutPaths.add(envPath);
+    const checkoutPaths = new Set<string>(
+      await resolveMateCheckoutPaths(this.bb, {
+        checkoutPath: input.checkoutPath,
+        mateThreadId: input.mateThreadId,
+      }),
+    );
 
     let last: Awaited<ReturnType<typeof applyFirstmateIntegration>> | null = null;
     for (const checkoutPath of checkoutPaths) {
@@ -139,11 +159,14 @@ export class FleetService {
     checkoutPath: string;
     mateThreadId?: string | null;
   }) {
-    const paths = new Set<string>([input.checkoutPath.trim()]);
-    if (input.mateThreadId) {
-      const envPath = await mateEnvironmentPath(this.bb, input.mateThreadId);
-      if (envPath) paths.add(envPath);
-    }
+    const paths = new Set<string>(
+      input.mateThreadId
+        ? await resolveMateCheckoutPaths(this.bb, {
+            checkoutPath: input.checkoutPath,
+            mateThreadId: input.mateThreadId,
+          })
+        : [input.checkoutPath.trim()],
+    );
     const reports = await Promise.all(
       [...paths].map(async (checkoutPath) => ({
         checkoutPath,
@@ -359,12 +382,13 @@ export class FleetService {
 
   private async resolveCrewSpawnEnvironment(
     node: FleetNode,
-    checkoutPath: string,
+    home: { checkoutPath: string; mateThreadId: string },
   ) {
     if (node.envId) {
       return { type: "reuse" as const, environmentId: node.envId };
     }
-    const metaPath = path.join(checkoutPath, "state", `${node.label}.meta`);
+    const stateRoot = await resolveMateStateRoot(this.bb, home);
+    const metaPath = path.join(stateRoot, "state", `${node.label}.meta`);
     try {
       const meta = await fs.readFile(metaPath, "utf8");
       const worktreeMatch = meta.match(/^worktree=(.+)$/m);
@@ -393,10 +417,21 @@ export class FleetService {
     const metaPath = path.join(checkoutPath, "state", `${taskId}.meta`);
     try {
       let meta = await fs.readFile(metaPath, "utf8");
-      meta = meta.replace(/^bb_thread_id=.*$/m, `bb_thread_id=${threadId}`);
+      if (!/^backend=.*$/m.test(meta)) {
+        meta += `\nbackend=bb\n`;
+      } else {
+        meta = meta.replace(/^backend=.*$/m, "backend=bb");
+      }
+      if (/^bb_thread_id=.*$/m.test(meta)) {
+        meta = meta.replace(/^bb_thread_id=.*$/m, `bb_thread_id=${threadId}`);
+      } else {
+        meta += `\nbb_thread_id=${threadId}\n`;
+      }
       const windowTarget = `@thread:${threadId}`;
       if (/^window=.*$/m.test(meta)) {
         meta = meta.replace(/^window=.*$/m, `window=${windowTarget}`);
+      } else {
+        meta += `\nwindow=${windowTarget}\n`;
       }
       if (envId) {
         if (/^bb_env_id=.*$/m.test(meta)) {
@@ -409,6 +444,153 @@ export class FleetService {
     } catch {
       // task meta may not exist yet
     }
+  }
+
+  async updateTaskMetaThreadIdForHome(
+    homeId: string,
+    taskId: string,
+    threadId: string,
+    envId?: string | null,
+  ): Promise<void> {
+    const home = this.store.getHome(homeId);
+    if (!home) return;
+    for (const checkoutPath of await resolveMateCheckoutPaths(this.bb, home)) {
+      await this.updateTaskMetaThreadId(checkoutPath, taskId, threadId, envId);
+    }
+  }
+
+  async syncCrewsFromStateMeta(
+    homeId: string,
+    checkoutPaths: string[],
+  ): Promise<number> {
+    const home = this.store.getHome(homeId);
+    if (!home) return 0;
+
+    const seenTasks = new Set<string>();
+    let synced = 0;
+
+    for (const checkoutPath of checkoutPaths) {
+      const stateDir = path.join(checkoutPath, "state");
+      let entries: string[];
+      try {
+        entries = await fs.readdir(stateDir);
+      } catch {
+        continue;
+      }
+
+      for (const name of entries) {
+        if (!name.endsWith(".meta")) continue;
+        const taskId = name.slice(0, -".meta".length);
+        if (seenTasks.has(taskId)) continue;
+        seenTasks.add(taskId);
+
+        if (this.store.listNodes(homeId).some((node) => node.label === taskId)) {
+          continue;
+        }
+
+        let meta = "";
+        try {
+          meta = await fs.readFile(path.join(stateDir, name), "utf8");
+        } catch {
+          continue;
+        }
+
+        const kind = metaField(meta, "kind");
+        if (kind !== "ship" && kind !== "scout") continue;
+
+        const role = kind as "ship" | "scout";
+        const bbThreadId = metaField(meta, "bb_thread_id");
+        const windowThread = metaField(meta, "window")?.match(/^@thread:(.+)$/)?.[1];
+        const threadId = bbThreadId || windowThread;
+
+        let statusPrefix: string | null = null;
+        let statusFsm: FsmState | null = null;
+        try {
+          const statusRaw = await fs.readFile(
+            path.join(stateDir, `${taskId}.status`),
+            "utf8",
+          );
+          const tail = statusRaw
+            .split("\n")
+            .filter((line) => line.trim())
+            .at(-1);
+          const parsed = tail ? parseStatusLine(tail) : null;
+          if (parsed) {
+            statusPrefix = parsed.prefix;
+            statusFsm = fsmFromStatusPrefix(parsed.prefix);
+          }
+        } catch {
+          // no status file
+        }
+
+        if (threadId && !isLegacyFleetThreadId(threadId)) {
+          this.store.insertNode({
+            homeId,
+            kind: "crew",
+            parentId: home.primaryMateId,
+            threadId,
+            label: taskId,
+            role,
+            envId: metaField(meta, "bb_env_id"),
+            deliveryMode:
+              (metaField(meta, "mode") as FleetNode["deliveryMode"]) ??
+              "no-mistakes",
+            yolo: metaField(meta, "yolo") === "on",
+            dispatchProfileId: null,
+          });
+          if (statusPrefix && statusFsm) {
+            this.store.appendLedger({
+              homeId,
+              threadId,
+              verb: ledgerVerbFromStatus(statusPrefix),
+              fsmState: statusFsm,
+              detail: { taskId, source: "meta-sync" },
+            });
+          }
+          if (statusFsm === "done") {
+            this.store.setLiveness(threadId, homeId, "dead", {
+              reason: "historical crew",
+            });
+          }
+          synced += 1;
+          continue;
+        }
+
+        const legacyId = legacyThreadId(homeId, taskId);
+        if (this.store.getNodeByThread(legacyId)) continue;
+
+        this.store.insertNode({
+          homeId,
+          kind: "crew",
+          parentId: home.primaryMateId,
+          threadId: legacyId,
+          label: taskId,
+          role,
+          envId: null,
+          deliveryMode:
+            (metaField(meta, "mode") as FleetNode["deliveryMode"]) ??
+            "no-mistakes",
+          yolo: metaField(meta, "yolo") === "on",
+          dispatchProfileId: null,
+        });
+        this.store.appendLedger({
+          homeId,
+          threadId: legacyId,
+          verb: statusPrefix
+            ? ledgerVerbFromStatus(statusPrefix)
+            : "crew.done",
+          fsmState: statusFsm ?? "done",
+          detail: { taskId, source: "legacy-meta-sync" },
+        });
+        this.store.setLiveness(legacyId, homeId, "dead", {
+          reason: "legacy crew without BB thread",
+        });
+        synced += 1;
+      }
+    }
+
+    if (synced > 0) this.publish();
+    return synced;
   }
 
   async pickCheckoutFolder(clientHostId?: string): Promise<{
@@ -814,6 +996,16 @@ export class FleetService {
   }
 
   async probeThread(threadId: string): Promise<LivenessVerdict> {
+    if (isLegacyFleetThreadId(threadId)) {
+      const node = this.store.getNodeByThread(threadId);
+      if (node) {
+        this.store.setLiveness(threadId, node.homeId, "dead", {
+          reason: "legacy crew",
+        });
+        return "dead";
+      }
+      return "missing";
+    }
     const node = this.store.getNodeByThread(threadId);
     if (!node) return "missing";
     try {
@@ -924,7 +1116,7 @@ export class FleetService {
     const thread = await this.bb.sdk.threads.spawn({
       projectId: mateThread.projectId,
       parentThreadId: mateThread.id,
-      environment: await this.resolveCrewSpawnEnvironment(node, home.checkoutPath),
+      environment: await this.resolveCrewSpawnEnvironment(node, home),
       prompt: text,
       title: `${role}: ${node.label}`,
       ...(profile?.model ? { model: profile.model } : {}),
@@ -939,11 +1131,11 @@ export class FleetService {
         relaunchOf: threadId,
       },
     });
-    await this.updateTaskMetaThreadId(
-      home.checkoutPath,
+    await this.updateTaskMetaThreadIdForHome(
+      homeId,
       node.label,
       thread.id,
-      thread.environmentId ?? node.envId,
+      thread.environmentId ?? null,
     );
     const updated =
       this.store.updateNodeThread(node.id, thread.id, thread.environmentId ?? null) ??
