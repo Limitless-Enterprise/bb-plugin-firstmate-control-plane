@@ -113,8 +113,7 @@ else
 fi
 
 printf '%s\n' "blocked: M1 full AC blocked probe" >"$FM_HOME/state/${TASK}.status"
-sleep 8
-if [ "$(tree_field "$TASK" fsmState)" = "blocked" ]; then
+if wait_fsm "$TASK" blocked >/dev/null; then
   record AC6 pass "blocked: → FSM blocked + mate wake path"
 else
   record AC6 fail "FSM=$(tree_field "$TASK" fsmState) after blocked:"

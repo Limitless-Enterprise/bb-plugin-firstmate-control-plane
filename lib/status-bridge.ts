@@ -157,11 +157,6 @@ export class StatusBridge {
     checkoutPath: string,
     taskId: string,
   ): Promise<string | null> {
-    const match = this.store
-      .listNodes(homeId)
-      .find((node) => node.label === taskId);
-    if (match) return match.threadId;
-
     const metaPath = path.join(checkoutPath, "state", `${taskId}.meta`);
     try {
       const meta = await fs.readFile(metaPath, "utf8");
@@ -172,7 +167,14 @@ export class StatusBridge {
     } catch {
       // no meta file
     }
-    return null;
+
+    const matches = this.store
+      .listNodes(homeId)
+      .filter((node) => node.label === taskId);
+    if (matches.length === 0) return null;
+    return matches.reduce((newest, node) =>
+      node.createdAtMs > newest.createdAtMs ? node : newest,
+    ).threadId;
   }
 }
 
