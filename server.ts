@@ -391,7 +391,11 @@ export default async function plugin(bb: BbPluginApi) {
           for (const node of nodes) {
             if (isLegacyFleetThreadId(node.threadId)) continue;
             const verdict = await fleet.probeThread(node.threadId);
-            if (verdict === "dead" || verdict === "missing") {
+            const liveness = store.getLiveness(node.threadId);
+            if (
+              (verdict === "dead" || verdict === "missing") &&
+              liveness?.detail?.controlStop !== true
+            ) {
               store.createInboxItem({
                 homeId: home.homeId,
                 threadId: node.threadId,

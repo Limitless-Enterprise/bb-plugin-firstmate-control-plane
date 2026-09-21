@@ -1100,7 +1100,6 @@ export class FleetService {
       const prevDetail = prev?.detail;
       if (
         prevDetail?.controlStop === true &&
-        prev?.verdict === "dead" &&
         status !== "active" &&
         status !== "running"
       ) {
@@ -1134,7 +1133,7 @@ export class FleetService {
       const prev = this.store.getLiveness(threadId);
       const prevDetail = prev?.detail;
       const detail: Record<string, unknown> = { error: String(error) };
-      if (prevDetail?.controlStop === true && prev?.verdict === "dead") {
+      if (prevDetail?.controlStop === true) {
         detail.controlStop = true;
       }
       this.store.setLiveness(threadId, node.homeId, "ambiguous", detail);
