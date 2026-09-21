@@ -1096,6 +1096,22 @@ export class FleetService {
       }
       const status = thread.status;
       const runtimeStatus = thread.runtime?.displayStatus;
+      const prev = this.store.getLiveness(threadId);
+      const prevDetail = prev?.detail;
+      if (
+        prevDetail?.controlStop === true &&
+        prev?.verdict === "dead" &&
+        status !== "active" &&
+        status !== "running"
+      ) {
+        this.store.setLiveness(threadId, node.homeId, "dead", {
+          ...prevDetail,
+          status,
+          runtimeStatus,
+          environmentId: thread.environmentId,
+        });
+        return "dead";
+      }
       let verdict: LivenessVerdict = "alive";
       if (status === "error" || status === "stopping") {
         verdict = "dead";
@@ -1154,7 +1170,10 @@ export class FleetService {
   async interrupt(homeId: string, threadId: string): Promise<void> {
     this.assertHome(homeId);
     await this.bb.sdk.threads.stop({ threadId });
-    await this.probeThread(threadId);
+    this.store.setLiveness(threadId, homeId, "dead", {
+      reason: "control.interrupt",
+      controlStop: true,
+    });
     this.store.appendLedger({
       homeId,
       threadId,
@@ -1167,6 +1186,10 @@ export class FleetService {
   async exitThread(homeId: string, threadId: string): Promise<void> {
     this.assertHome(homeId);
     await this.bb.sdk.threads.stop({ threadId });
+    this.store.setLiveness(threadId, homeId, "dead", {
+      reason: "control.exit",
+      controlStop: true,
+    });
     this.store.appendLedger({
       homeId,
       threadId,

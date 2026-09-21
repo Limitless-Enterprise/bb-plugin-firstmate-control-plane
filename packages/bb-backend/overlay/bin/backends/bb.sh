@@ -96,16 +96,31 @@ fm_backend_bb_target_exists() {
 
 fm_backend_bb_agent_state() {
   local target=$1
-  local tid status
+  local tid json status env_id
   tid="$(fm_backend_bb_thread_id_from_target "$target")"
   if ! fm_backend_bb_target_exists "$target"; then
     printf 'missing'
     return 0
   fi
-  status="$(fm_backend_bb_thread_status "$tid")"
+  json="$(bb thread get "$tid" --json 2>/dev/null || true)"
+  status="$(
+    printf '%s' "$json" \
+      | jq -r '.thread.status // .status // "unknown"' 2>/dev/null \
+      || printf 'unknown'
+  )"
+  env_id="$(
+    printf '%s' "$json" \
+      | jq -r '.thread.environmentId // empty' 2>/dev/null \
+      || true
+  )"
   case "$status" in
     active|running|idle|starting|stopping) printf 'alive' ;;
-    error|failed|stopped) printf 'dead' ;;
+    error|failed)
+      # Stop/cancel can leave a bound thread in error while the worktree
+      # endpoint persists — still alive for interrupt/relaunch postconditions.
+      if [ -n "$env_id" ]; then printf 'alive'; else printf 'dead'; fi
+      ;;
+    stopped) printf 'dead' ;;
     *) printf 'unknown' ;;
   esac
 }
