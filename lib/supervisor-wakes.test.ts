@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   isSemanticallyBlocked,
-  isTerminalFsm,
   latestSemanticWorkingAtMs,
   shouldEnqueueBusyAgeStall,
   shouldEnqueueStaleIdleSupervision,
@@ -29,12 +28,6 @@ function probe(entries: Entry[]) {
 }
 
 describe("supervisor wake eligibility (turn-end guard)", () => {
-  it("treats done/stopped/error as terminal", () => {
-    for (const fsm of ["done", "stopped", "error"] as const) {
-      assert.equal(isTerminalFsm(fsm), true);
-    }
-  });
-
   it("stale-idle wakes only idle FSM", () => {
     assert.equal(shouldEnqueueStaleIdleWake("idle"), true);
     assert.equal(shouldEnqueueStaleIdleWake("working"), false);
@@ -119,6 +112,28 @@ describe("semantic blocked and busy-age probes", () => {
     assert.equal(
       shouldEnqueueStaleIdleSupervision("idle", p, "t1", false),
       false,
+    );
+  });
+
+  it("skips stale-idle when crew.done superseded working", () => {
+    const p = probe([
+      { verb: "crew.working", createdAtMs: 1000 },
+      { verb: "crew.done", createdAtMs: 2000 },
+    ]);
+    assert.equal(
+      shouldEnqueueStaleIdleSupervision("idle", p, "t1", false),
+      false,
+    );
+  });
+
+  it("allows stale-idle after mark.idle cleared working", () => {
+    const p = probe([
+      { verb: "crew.working", createdAtMs: 1000 },
+      { verb: "mark.idle", createdAtMs: 2000 },
+    ]);
+    assert.equal(
+      shouldEnqueueStaleIdleSupervision("idle", p, "t1", false),
+      true,
     );
   });
 });

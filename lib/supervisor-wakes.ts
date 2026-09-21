@@ -1,11 +1,6 @@
 import { BUSY_AGE_LEDGER_VERBS } from "./fsm";
 import type { FsmState } from "./types";
 
-/** Terminal FSM states — no stall / stale-idle supervision wakes. */
-export function isTerminalFsm(fsm: FsmState): boolean {
-  return fsm === "done" || fsm === "stopped" || fsm === "error";
-}
-
 export function shouldEnqueueStaleIdleWake(fsm: FsmState): boolean {
   return fsm === "idle";
 }
@@ -24,6 +19,18 @@ const SUPERSEDES_WORKING_VERBS = [
   "mark.error",
   "liveness.dead",
   "mark.idle",
+];
+const TERMINAL_LEDGER_VERBS = [
+  "mark.done",
+  "crew.done",
+  "task.complete",
+  "control.exit",
+  "control.stop",
+  "thread.stopped",
+  "turn.failed",
+  "crew.failed",
+  "mark.error",
+  "liveness.dead",
 ];
 
 type LedgerProbe = {
@@ -64,6 +71,17 @@ export function latestSemanticWorkingAtMs(
   return lastWorking.createdAtMs;
 }
 
+function hasTerminalLedgerState(
+  probe: LedgerProbe,
+  threadId: string,
+): boolean {
+  const lastTerminal = probe.latestLedgerByVerbs(threadId, TERMINAL_LEDGER_VERBS);
+  if (!lastTerminal) return false;
+  const lastWorking = probe.latestLedgerByVerbs(threadId, BUSY_AGE_LEDGER_VERBS);
+  if (!lastWorking) return true;
+  return lastTerminal.createdAtMs > lastWorking.createdAtMs;
+}
+
 export function shouldEnqueueBusyAgeStall(
   probe: LedgerProbe,
   threadId: string,
@@ -85,5 +103,6 @@ export function shouldEnqueueStaleIdleSupervision(
 ): boolean {
   if (!shouldEnqueueStaleIdleWake(fsm)) return false;
   if (latestSemanticWorkingAtMs(probe, threadId) !== null) return false;
+  if (hasTerminalLedgerState(probe, threadId)) return false;
   return !isSemanticallyBlocked(probe, threadId, hasOpenHolds);
 }
