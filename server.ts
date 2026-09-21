@@ -429,18 +429,24 @@ export default async function plugin(bb: BbPluginApi) {
           });
           continue;
         }
-        await bb.storage.kv.set(SUPERVISOR_LOCK_KEY, {
-          owner,
-          expiresMs: now + config.probeIntervalMs + 2000,
-        });
+        const lockTtlMs = config.probeIntervalMs + 2000;
+        const refreshSupervisorLock = async () => {
+          await bb.storage.kv.set(SUPERVISOR_LOCK_KEY, {
+            owner,
+            expiresMs: Date.now() + lockTtlMs,
+          });
+        };
+        await refreshSupervisorLock();
 
         const homes = store.listHomes();
         for (const home of homes) {
           const nodes = store.listNodes(home.homeId);
           for (const node of nodes) {
             if (isLegacyFleetThreadId(node.threadId)) continue;
+            await refreshSupervisorLock();
             const fsm = fleet.fsmForThread(node.threadId);
             const verdict = await fleet.probeThread(node.threadId);
+            await refreshSupervisorLock();
             const liveness = store.getLiveness(node.threadId);
             if (
               (verdict === "dead" || verdict === "missing") &&

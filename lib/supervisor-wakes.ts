@@ -6,10 +6,6 @@ export function isTerminalFsm(fsm: FsmState): boolean {
   return fsm === "done" || fsm === "stopped" || fsm === "error";
 }
 
-export function shouldEnqueueBusyAgeWake(fsm: FsmState): boolean {
-  return !isTerminalFsm(fsm) && (fsm === "working" || fsm === "starting");
-}
-
 export function shouldEnqueueStaleIdleWake(fsm: FsmState): boolean {
   return fsm === "idle";
 }
@@ -24,6 +20,7 @@ const SUPERSEDES_WORKING_VERBS = [
   "control.stop",
   "thread.stopped",
   "turn.failed",
+  "crew.failed",
   "mark.error",
   "liveness.dead",
   "mark.idle",
@@ -87,5 +84,6 @@ export function shouldEnqueueStaleIdleSupervision(
   hasOpenHolds: boolean,
 ): boolean {
   if (!shouldEnqueueStaleIdleWake(fsm)) return false;
+  if (latestSemanticWorkingAtMs(probe, threadId) !== null) return false;
   return !isSemanticallyBlocked(probe, threadId, hasOpenHolds);
 }
