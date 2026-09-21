@@ -112,6 +112,10 @@ if [ "$USE_BB_TEARDOWN" = 1 ]; then
   fi
 fi
 
+if [ "$USE_BB_TEARDOWN" = 1 ]; then
+  echo "treehouse: skipping pool return (BB-managed worktree)" >&2
+fi
+
 link_native_teardown_libs "$FM_ROOT/bin" "$(dirname "$NATIVE")"
 export FM_ROOT_OVERRIDE="$FM_ROOT"
 export FM_HOME="${FM_HOME:-$FM_ROOT}"
