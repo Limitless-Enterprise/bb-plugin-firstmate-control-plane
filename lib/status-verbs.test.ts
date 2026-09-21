@@ -26,6 +26,11 @@ describe("fsmFromStatusPrefix", () => {
     assert.equal(fsmFromStatusPrefix("blocked:"), "blocked");
     assert.equal(fsmFromStatusPrefix("needs-decision:"), "blocked");
   });
+
+  it("maps paused and resolved to idle FSM", () => {
+    assert.equal(fsmFromStatusPrefix("paused:"), "idle");
+    assert.equal(fsmFromStatusPrefix("resolved:"), "idle");
+  });
 });
 
 describe("ledgerVerbFromStatus", () => {

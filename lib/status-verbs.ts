@@ -45,6 +45,7 @@ export function fsmFromStatusPrefix(prefix: string): FsmState | null {
     case "needs-decision:":
       return "blocked";
     case "paused:":
+    case "resolved:":
       return "idle";
     default:
       return null;

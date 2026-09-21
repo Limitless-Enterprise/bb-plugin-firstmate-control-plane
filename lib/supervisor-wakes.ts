@@ -10,13 +10,10 @@ const SUPERSEDES_WORKING_VERBS = [
   "crew.done",
   "task.complete",
   "control.exit",
-  "control.stop",
   "control.interrupt",
-  "thread.stopped",
   "turn.failed",
   "crew.failed",
   "mark.error",
-  "liveness.dead",
   "mark.idle",
   "crew.paused",
   "crew.resolved",
@@ -26,13 +23,10 @@ const TERMINAL_LEDGER_VERBS = [
   "crew.done",
   "task.complete",
   "control.exit",
-  "control.stop",
   "control.interrupt",
-  "thread.stopped",
   "turn.failed",
   "crew.failed",
   "mark.error",
-  "liveness.dead",
 ];
 
 type LedgerProbe = {

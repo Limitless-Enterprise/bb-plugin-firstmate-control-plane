@@ -1181,7 +1181,6 @@ export class FleetService {
 
   async interrupt(homeId: string, threadId: string): Promise<void> {
     this.assertHome(homeId);
-    await this.bb.sdk.threads.stop({ threadId });
     this.store.setLiveness(threadId, homeId, "dead", {
       reason: "control.interrupt",
       controlStop: true,
@@ -1192,12 +1191,12 @@ export class FleetService {
       verb: "control.interrupt",
       fsmState: "stopped",
     });
+    await this.bb.sdk.threads.stop({ threadId });
     this.publish();
   }
 
   async exitThread(homeId: string, threadId: string): Promise<void> {
     this.assertHome(homeId);
-    await this.bb.sdk.threads.stop({ threadId });
     this.store.setLiveness(threadId, homeId, "dead", {
       reason: "control.exit",
       controlStop: true,
@@ -1208,6 +1207,7 @@ export class FleetService {
       verb: "control.exit",
       fsmState: "stopped",
     });
+    await this.bb.sdk.threads.stop({ threadId });
     this.publish();
   }
 
