@@ -458,7 +458,9 @@ export default async function plugin(bb: BbPluginApi) {
             }
             if (shouldEnqueueBusyAgeWake(fsm)) {
               const entries = store.tailLedger(node.threadId, 20);
-              const lastWorking = entries.find((e) => e.verb === "mark.working");
+              const lastWorking = entries.find(
+                (e) => e.verb === "mark.working" || e.verb === "mark.starting",
+              );
               if (
                 lastWorking &&
                 Date.now() - lastWorking.createdAtMs > config.busyAgeSec * 1000

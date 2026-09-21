@@ -1344,7 +1344,16 @@ export class FleetService {
         }
       }
 
-      if (!threadMissing && metaPresent) continue;
+      if (metaPresent) {
+        if (threadMissing) {
+          skipped.push({
+            threadId: node.threadId,
+            label: node.label,
+            reason: "meta-without-thread",
+          });
+        }
+        continue;
+      }
 
       if (this.hasOpenHolds(homeId, node.threadId)) {
         skipped.push({
