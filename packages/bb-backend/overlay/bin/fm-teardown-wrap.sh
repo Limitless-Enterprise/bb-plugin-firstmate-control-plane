@@ -90,9 +90,19 @@ if [ "$USE_BB_TEARDOWN" = 1 ]; then
     if [ -f "$meta" ]; then
       tid=$(grep '^bb_thread_id=' "$meta" 2>/dev/null | cut -d= -f2- | head -n1 || true)
       if [ -n "$tid" ] && command -v bb >/dev/null 2>&1; then
-        open_holds=$(bb fleet hold list --mate "$FM_BB_HOME_ID" --thread "$tid" --json 2>/dev/null \
-          | jq -r '.openCount // 0' 2>/dev/null || echo 0)
-        if [ "${open_holds:-0}" -gt 0 ]; then
+        hold_json=$(bb fleet hold list --mate "$FM_BB_HOME_ID" --thread "$tid" --json 2>/dev/null) || {
+          echo "fm-bb: teardown refused — could not verify open holds for ${TASK_ID}" >&2
+          exit 2
+        }
+        open_holds=$(echo "$hold_json" | jq -r '.openCount // empty' 2>/dev/null) || {
+          echo "fm-bb: teardown refused — could not parse hold list for ${TASK_ID}" >&2
+          exit 2
+        }
+        if [ -z "$open_holds" ]; then
+          echo "fm-bb: teardown refused — hold count missing for ${TASK_ID}" >&2
+          exit 2
+        fi
+        if [ "$open_holds" -gt 0 ]; then
           echo "fm-bb: teardown refused — ${open_holds} open hold(s) on ${TASK_ID}" >&2
           exit 2
         fi

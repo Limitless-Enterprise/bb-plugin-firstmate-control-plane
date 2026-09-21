@@ -39,7 +39,7 @@ export function projectFsm(
       continue;
     }
     if (ERROR_VERBS.has(verb)) {
-      if (!SEMANTIC_WORKING.has(state)) {
+      if (state !== "blocked") {
         state = "error";
       }
       continue;

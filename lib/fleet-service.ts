@@ -1316,13 +1316,23 @@ export class FleetService {
       if (isLegacyFleetThreadId(node.threadId)) continue;
 
       let threadMissing = false;
+      let threadLookupFailed = false;
       try {
         const thread = await this.bb.sdk.threads.get({
           threadId: node.threadId,
         });
         if (!thread) threadMissing = true;
       } catch {
-        threadMissing = true;
+        threadLookupFailed = true;
+      }
+
+      if (threadLookupFailed) {
+        skipped.push({
+          threadId: node.threadId,
+          label: node.label,
+          reason: "thread lookup failed",
+        });
+        continue;
       }
 
       let metaPresent = false;
