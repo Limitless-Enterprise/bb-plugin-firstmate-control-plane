@@ -118,6 +118,11 @@ liveness inbox items when `controlStop` is set.
 }
 ```
 
+CLI: `bb fleet hold open --mate <homeId> --thread <id> --title … --body …`
+(enqueues mate wake + Fleet Inbox item); `bb fleet hold list [--mate <homeId>] [--thread <id>] [--json]`
+returns `{ holds, openCount }`; `bb fleet hold resolve <id> [--mate <homeId>]`.
+Resolving the last open hold on a thread appends `mark.idle` and clears blocked FSM.
+
 ## Fleet inbox item
 
 ```ts
@@ -151,6 +156,9 @@ liveness inbox items when `controlStop` is set.
 - Status board via `bb fleet board [--mate <homeId>] [--json]` (FSM lanes; probes liveness).
 - Captain inbox via `bb fleet inbox [--mate <homeId>] [--json] [--limit N]` — JSON
   `{ items, totalOpen, limit }`; default limit 100, max 500.
+- Holds via `bb fleet hold open|list|resolve` (see [Hold](#hold)).
+- Orphan cleanup via `bb fleet sweep [--mate <homeId>] [--json]` — `{ removed, skipped }`.
+- Dispatch profiles via `bb fleet profiles --mate <homeId>`.
 - Captain attention via **Fleet Inbox** only — not Command Center inbox.
 
 ## Isolation
@@ -175,7 +183,9 @@ After clone/bootstrap, the plugin applies overlay **v3** from `packages/bb-backe
 When `enabled: true`, ship/scout spawns call `bb fleet spawn` and register crew nodes.
 For crews with `backend=bb` in task meta (or re-run teardown when meta is already
 gone but `state/<task>.backlog-close` or `config/backend=bb` indicates BB), `fm-teardown`
-skips treehouse pool return, detaches the BB thread, then runs native teardown. If native
+refuses (exit 2) while `bb fleet hold list` reports `openCount > 0` for the crew
+thread, then skips treehouse pool return, detaches the BB thread, and runs native
+teardown. If native
 teardown fails after meta is cleared but `state/<task>.backlog-close` remains (ad-hoc scouts
 absent from tasks-axi), the wrapper removes the marker and exits 0. `fm-spawn --relaunch` and
 `--secondmate` still use native Firstmate backends; crew relaunch on BB threads is
@@ -194,6 +204,12 @@ See `packages/bb-backend/overlay/README.md` for the installed file tree.
 |---|---|---|
 | `probeIntervalSec` | 10 | 5 |
 | `statusBridgeIntervalSec` | 3 | 2 |
+| `busyAgeSec` | 900 | 60 |
+| `staleIdleSec` | 1800 | 60 |
+| `autoRespawn` | false | — |
 
 Status bridge scans mate checkout `state/*.status` on this interval; liveness probes
-run on `probeIntervalSec`.
+run on `probeIntervalSec`. The `fleet-supervisor` background service holds a
+session lock (`fleet.supervisor.lock`), probes threads each cycle, and enqueues
+busy-age stall / stale-idle wakes using ledger semantics (semantic blocked and
+terminal states suppress spurious wakes; `turn.failed` does not override them).

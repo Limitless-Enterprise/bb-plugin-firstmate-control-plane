@@ -28,6 +28,9 @@ bb fleet secondmate create --mate cto --thread <threadId> --label platform-lead
 - `bb fleet interrupt|exit|relaunch|detach --mate cto --thread <id>` — control plane
   (`interrupt`/`exit` pin liveness dead; see contracts/README.md)
 - `bb fleet inbox --mate cto [--limit 100]` — Captain inbox (JSON: items, totalOpen, limit; max --limit 500)
+- `bb fleet hold open|list|resolve --mate cto [--thread <id>]` — holds (list JSON: `{ holds, openCount }`)
+- `bb fleet sweep --mate cto` — remove orphan registry nodes
+- `bb fleet profiles --mate cto` — dispatch profiles CRUD
 - `bb fleet digest --mate cto --tell-cos` — CoS digest
 - `bb fleet bearings --mate cto` — CoS bearings snapshot
 - `bb fleet integration apply|check --mate cto` — overlay install/verify

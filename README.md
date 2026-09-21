@@ -23,6 +23,9 @@ bb fleet digest --mate cto --tell-cos
 bb fleet bearings --mate cto
 bb fleet steer --mate cto --thread <threadId> --text "Continue on the PR feedback"
 bb fleet interrupt|exit|relaunch|detach --mate cto --thread <threadId>
+bb fleet hold open|list|resolve --mate cto --thread <threadId> ...
+bb fleet sweep --mate cto
+bb fleet profiles --mate cto
 bb fleet integration apply --mate cto
 bb fleet integration check --mate cto
 ```
@@ -35,6 +38,18 @@ Inbox, status board, and crew overflow controls (interrupt, exit, relaunch, deta
 ## Implementation plan
 
 See [docs/IMPLEMENTATION_PLAN.md](./docs/IMPLEMENTATION_PLAN.md) and [docs/CAPABILITY_INVENTORY.md](./docs/CAPABILITY_INVENTORY.md).
+
+## M1 acceptance
+
+After build, plugin install, and `bb fleet integration apply --mate <homeId>`:
+
+```sh
+export FM_HOME=/path/to/firstmate-tech
+export MATE=tech
+./scripts/m1-ac-full.sh
+```
+
+See [docs/IMPLEMENTATION_PLAN.md §8](./docs/IMPLEMENTATION_PLAN.md#8-m1-acceptance-criteria-full-suite) for the full AC matrix.
 
 ## Contracts
 
