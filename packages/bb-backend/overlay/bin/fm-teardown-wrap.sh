@@ -6,6 +6,8 @@ set -eu
 FM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NATIVE="$FM_ROOT/.bb-integration/native/bin/fm-teardown.sh"
 INTEGRATION_BIN="$FM_ROOT/.bb-integration/bin"
+# shellcheck source=/dev/null
+. "$INTEGRATION_BIN/fm-bb-lib.sh"
 
 if [ ! -x "$NATIVE" ]; then
   echo "fm-bb: native fm-teardown backup missing at $NATIVE" >&2
@@ -26,10 +28,7 @@ for arg in "$@"; do
 done
 
 USE_BB_TEARDOWN=0
-if [ -f "$FM_ROOT/config/backend" ] && [ "$(tr -d '[:space:]' <"$FM_ROOT/config/backend")" = bb ]; then
-  USE_BB_TEARDOWN=1
-fi
-if [ -n "$TASK_ID" ] && [ -f "$FM_ROOT/state/$TASK_ID.meta" ]; then
+if fm_bb_enabled && [ -n "$TASK_ID" ] && [ -f "$FM_ROOT/state/$TASK_ID.meta" ]; then
   backend=$(grep '^backend=' "$FM_ROOT/state/$TASK_ID.meta" 2>/dev/null | cut -d= -f2- | head -n1 || true)
   if [ "$backend" = bb ]; then
     USE_BB_TEARDOWN=1
@@ -75,9 +74,7 @@ EOF
 if [ "$USE_BB_TEARDOWN" = 1 ]; then
   export FM_BB_SKIP_TREEHOUSE=1
   export PATH="$INTEGRATION_BIN:$PATH"
-  # shellcheck source=/dev/null
-  . "$INTEGRATION_BIN/fm-bb-lib.sh"
-  if fm_bb_load_config && [ -n "$TASK_ID" ] && [ -n "$FM_BB_HOME_ID" ]; then
+  if fm_bb_load_config && [ "$FM_BB_ENABLED" = 1 ] && [ -n "$TASK_ID" ] && [ -n "$FM_BB_HOME_ID" ]; then
     meta="$FM_ROOT/state/$TASK_ID.meta"
     if [ -f "$meta" ]; then
       tid=$(grep '^bb_thread_id=' "$meta" 2>/dev/null | cut -d= -f2- | head -n1 || true)
