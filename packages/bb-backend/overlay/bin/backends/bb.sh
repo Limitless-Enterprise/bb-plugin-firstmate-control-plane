@@ -120,7 +120,9 @@ fm_backend_bb_agent_state() {
       # endpoint persists — still alive for interrupt/relaunch postconditions.
       if [ -n "$env_id" ]; then printf 'alive'; else printf 'dead'; fi
       ;;
-    stopped) printf 'dead' ;;
+    stopped)
+      if [ -n "$env_id" ]; then printf 'alive'; else printf 'dead'; fi
+      ;;
     *) printf 'unknown' ;;
   esac
 }
