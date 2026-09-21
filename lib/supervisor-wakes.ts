@@ -21,6 +21,7 @@ const SUPERSEDES_WORKING_VERBS = [
   "liveness.dead",
   "mark.idle",
   "crew.paused",
+  "crew.resolved",
 ];
 const TERMINAL_LEDGER_VERBS = [
   "mark.done",
