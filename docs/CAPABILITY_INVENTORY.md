@@ -60,7 +60,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | B-C1 | fm-control interrupt | ✓ | ⚠ |
 | B-C2 | fm-control exit | ✓ | ⚠ |
 | B-C3 | fm-control relaunch | ✓ | 🔲 |
-| B-C4 | fm-teardown full path | ✓ | 🔲 |
+| B-C4 | fm-teardown full path | ✓ | ⚠ |
 | B-C5 | Teardown refused (holds/dirty) | ✓ | 🔲 |
 | B-C6 | Backlog done (native) | ✓ | ✅ |
 

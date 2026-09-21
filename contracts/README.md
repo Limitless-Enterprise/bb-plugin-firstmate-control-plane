@@ -151,16 +151,20 @@ Every RPC enforces `homeId`. Cross-home reads/writes fail closed.
 
 After clone/bootstrap, the plugin applies overlay **v2** from `packages/bb-backend/overlay/`:
 
-- Backs up native `bin/fm-spawn.sh` and `bin/fm-backend.sh` under `.bb-integration/native/`
-- Installs wrappers as `bin/fm-spawn.sh` and `bin/fm-backend.sh` (adds `bb` backend)
-- Copies adapter scripts into `.bb-integration/bin/` and `bin/backends/bb.sh`
+- Backs up native `bin/fm-spawn.sh`, `bin/fm-backend.sh`, and `bin/fm-teardown.sh`
+  under `.bb-integration/native/` (creates `fm-backend-native.sh` alias at apply)
+- Installs wrappers as `bin/fm-spawn.sh`, `bin/fm-backend.sh`, and `bin/fm-teardown.sh`
+- Copies adapter scripts (including `treehouse` shim) into `.bb-integration/bin/`
+  and `bin/backends/bb.sh`
 - Writes `config/backend` (`bb`) and `config/bb-integration.json` with
   `{ enabled, homeId, mateThreadId, version, appliedAtMs }`
 - Copies `docs/bb-integration/AGENTS.bb.md` for mate-thread instructions
 
 When `enabled: true`, ship/scout spawns call `bb fleet spawn` and register crew nodes.
-`fm-spawn --relaunch` and `--secondmate` still use native Firstmate backends; crew
-relaunch on BB threads is via `bb fleet relaunch` or Fleet UI controls. Status bridge
+For crews with `backend=bb` in task meta, `fm-teardown` skips treehouse pool return
+and detaches the BB thread before native teardown. `fm-spawn --relaunch` and
+`--secondmate` still use native Firstmate backends; crew relaunch on BB threads is
+via `bb fleet relaunch` or Fleet UI controls. Status bridge
 watches `<mate-checkout>/state/<id>.status` for `working:`, `done:`, `failed:`,
 `blocked:`, `paused:`, and `needs-decision:` (`resolved:` / `note:` not yet).
 PR poller watches GitHub checks.

@@ -18,6 +18,8 @@ overlay/
     fm-bb-spawn.sh          # BB fleet spawn adapter
     fm-spawn-wrap.sh        # Installed as bin/fm-spawn.sh
     fm-backend-wrap.sh      # Installed as bin/fm-backend.sh
+    fm-teardown-wrap.sh     # Installed as bin/fm-teardown.sh
+    treehouse               # Treehouse shim for backend=bb teardown
     backends/bb.sh          # fm-backend adapter (also bin/backends/bb.sh)
 ```
 

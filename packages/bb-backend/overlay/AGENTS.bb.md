@@ -21,6 +21,15 @@ Unsupported until M3: `--secondmate` (still uses the native backend).
 `fm-spawn --relaunch` also uses the native backend. To relaunch a crew on BB
 threads, use **`bb fleet relaunch`** or the Fleet panel overflow controls.
 
+## Teardown
+
+Use **`bin/fm-teardown.sh`** as documented in AGENTS.md.
+
+When integration is enabled and `state/<task>.meta` has `backend=bb`, the wrapper
+skips treehouse pool return (BB owns the worktree env), attempts `bb fleet detach`
+for the crew thread, then runs native teardown. Other backends (e.g. relaunch crews)
+keep the normal treehouse return path.
+
 ## Visibility
 
 ```sh
