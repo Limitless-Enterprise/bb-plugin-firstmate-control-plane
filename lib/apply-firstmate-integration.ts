@@ -42,6 +42,8 @@ const OVERLAY_FILES = [
   "bin/fm-bb-spawn.sh",
   "bin/fm-spawn-wrap.sh",
   "bin/fm-backend-wrap.sh",
+  "bin/fm-teardown-wrap.sh",
+  "bin/treehouse",
   "bin/backends/bb.sh",
 ] as const;
 
@@ -83,6 +85,28 @@ async function backupNativeFile(
   }
 
   await copyFileExecutable(livePath, nativePath);
+}
+
+async function ensureNativeBackendAlias(checkoutPath: string): Promise<void> {
+  const nativeBackend = path.join(
+    checkoutPath,
+    ".bb-integration",
+    "native",
+    "bin",
+    "fm-backend.sh",
+  );
+  const nativeAlias = path.join(
+    checkoutPath,
+    ".bb-integration",
+    "native",
+    "bin",
+    "fm-backend-native.sh",
+  );
+  if (!(await pathExists(nativeBackend)) || (await pathExists(nativeAlias))) {
+    return;
+  }
+  await fs.copyFile(nativeBackend, nativeAlias);
+  await fs.chmod(nativeAlias, 0o755);
 }
 
 async function ensureGitExclude(
@@ -142,6 +166,8 @@ export async function applyFirstmateIntegration(
 
   await backupNativeFile(checkoutPath, "bin/fm-spawn.sh");
   await backupNativeFile(checkoutPath, "bin/fm-backend.sh");
+  await ensureNativeBackendAlias(checkoutPath);
+  await backupNativeFile(checkoutPath, "bin/fm-teardown.sh");
 
   const integrationRoot = path.join(checkoutPath, ".bb-integration");
   for (const relative of OVERLAY_FILES) {
@@ -156,6 +182,11 @@ export async function applyFirstmateIntegration(
     checkoutPath,
     "bin/fm-backend-wrap.sh",
     "bin/fm-backend.sh",
+  );
+  await installWrapper(
+    checkoutPath,
+    "bin/fm-teardown-wrap.sh",
+    "bin/fm-teardown.sh",
   );
   await installWrapper(
     checkoutPath,
@@ -254,6 +285,8 @@ export async function runIntegrationSelfCheck(
     ".bb-integration/bin/backends/bb.sh",
     ".bb-integration/native/bin/fm-spawn.sh",
     ".bb-integration/native/bin/fm-backend.sh",
+    ".bb-integration/native/bin/fm-teardown.sh",
+    ".bb-integration/bin/treehouse",
     "bin/backends/bb.sh",
     "config/bb-integration.json",
     "config/backend",

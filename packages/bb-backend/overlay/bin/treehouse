@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Treehouse shim for BB-backend teardown: skip pool return for BB-managed worktrees.
+set -eu
+
+if [ "${FM_BB_SKIP_TREEHOUSE:-}" = 1 ] && [ "${1:-}" = return ]; then
+  echo "treehouse: skipping pool return (BB-managed worktree)" >&2
+  exit 0
+fi
+
+REAL_TREEHOUSE=
+for candidate in /usr/bin/treehouse /usr/local/bin/treehouse; do
+  if [ -x "$candidate" ]; then
+    REAL_TREEHOUSE=$candidate
+    break
+  fi
+done
+if [ -z "$REAL_TREEHOUSE" ]; then
+  REAL_TREEHOUSE=$(command -v treehouse 2>/dev/null || true)
+fi
+while [ -n "$REAL_TREEHOUSE" ] && [ "$REAL_TREEHOUSE" = "$0" ]; do
+  REAL_TREEHOUSE=$(command -v -a treehouse 2>/dev/null | sed -n '2p')
+done
+
+if [ -z "$REAL_TREEHOUSE" ] || [ ! -x "$REAL_TREEHOUSE" ]; then
+  echo "treehouse: real treehouse binary not found" >&2
+  exit 127
+fi
+
+exec "$REAL_TREEHOUSE" "$@"

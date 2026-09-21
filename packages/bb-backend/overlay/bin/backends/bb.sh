@@ -81,7 +81,7 @@ fm_backend_bb_agent_state() {
     printf 'missing'
     return 0
   fi
-  status="$(bb thread get "$tid" --json 2>/dev/null | jq -r '.status // unknown' || printf 'unreadable')"
+  status="$(bb thread get "$tid" --json 2>/dev/null | jq -r '.status // "unknown"' || printf 'unreadable')"
   case "$status" in
     active|running) printf 'alive' ;;
     idle) printf 'alive' ;;
@@ -103,7 +103,7 @@ fm_backend_bb_busy_state() {
   local target=$1
   local tid status
   tid="$(fm_backend_bb_thread_id_from_target "$target")"
-  status="$(bb thread get "$tid" --json 2>/dev/null | jq -r '.status // unknown' || printf 'unknown')"
+  status="$(bb thread get "$tid" --json 2>/dev/null | jq -r '.status // "unknown"' || printf 'unknown')"
   case "$status" in
     active|running) printf 'busy' ;;
     idle) printf 'idle' ;;

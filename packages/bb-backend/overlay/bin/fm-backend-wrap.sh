@@ -3,8 +3,11 @@
 # Extends native fm-backend with the bb adapter without editing upstream core.
 set -eu
 
-FM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-NATIVE="$FM_ROOT/.bb-integration/native/bin/fm-backend.sh"
+FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+NATIVE="$FM_ROOT/.bb-integration/native/bin/fm-backend-native.sh"
+if [ ! -f "$NATIVE" ]; then
+  NATIVE="$FM_ROOT/.bb-integration/native/bin/fm-backend.sh"
+fi
 
 if [ ! -f "$NATIVE" ]; then
   echo "fm-bb: native fm-backend backup missing at $NATIVE" >&2
