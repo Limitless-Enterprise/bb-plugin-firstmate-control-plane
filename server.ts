@@ -6,6 +6,7 @@ import { projectFsm } from "./lib/fsm";
 import { createStatusBridge } from "./lib/status-bridge";
 import { createPrPoller } from "./lib/pr-poller";
 import {
+  hasTerminalLedgerState,
   isSemanticallyBlocked,
   shouldEnqueueBusyAgeStall,
   shouldEnqueueStaleIdleSupervision,
@@ -319,19 +320,19 @@ export default async function plugin(bb: BbPluginApi) {
     const threadId = event.threadId;
     const node = store.getNodeByThread(threadId);
     if (!node) return;
+    const hasOpenHolds = fleet.hasOpenHolds(node.homeId, threadId);
+    const liveness = store.getLiveness(threadId);
+    const suppressTurnFailedWake =
+      isSemanticallyBlocked(store, threadId, hasOpenHolds) ||
+      liveness?.detail?.controlStop === true ||
+      hasTerminalLedgerState(store, threadId);
     store.appendLedger({
       homeId: node.homeId,
       threadId,
       verb: "turn.failed",
       fsmState: "error",
     });
-    if (
-      !isSemanticallyBlocked(
-        store,
-        threadId,
-        fleet.hasOpenHolds(node.homeId, threadId),
-      )
-    ) {
+    if (!suppressTurnFailedWake) {
       store.enqueueWake({
         homeId: node.homeId,
         threadId,

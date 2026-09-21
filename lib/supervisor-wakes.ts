@@ -1,11 +1,9 @@
-import { BUSY_AGE_LEDGER_VERBS } from "./fsm";
+import { BLOCKED_VERBS, BUSY_AGE_LEDGER_VERBS } from "./fsm";
 import type { FsmState } from "./types";
 
 export function shouldEnqueueStaleIdleWake(fsm: FsmState): boolean {
   return fsm === "idle";
 }
-
-const BLOCKED_LEDGER_VERBS = ["mark.blocked", "crew.blocked"];
 const IDLE_UNBLOCK_LEDGER_VERBS = ["mark.idle", "crew.resolved", "crew.paused"];
 const SUPERSEDES_WORKING_VERBS = [
   "mark.done",
@@ -50,7 +48,7 @@ export function isSemanticallyBlocked(
   hasOpenHolds: boolean,
 ): boolean {
   if (hasOpenHolds) return true;
-  const lastBlocked = probe.latestLedgerByVerbs(threadId, BLOCKED_LEDGER_VERBS);
+  const lastBlocked = probe.latestLedgerByVerbs(threadId, BLOCKED_VERBS);
   if (!lastBlocked) return false;
   const lastUnblock = probe.latestLedgerByVerbs(
     threadId,
@@ -75,7 +73,7 @@ export function latestSemanticWorkingAtMs(
   return lastWorking.createdAtMs;
 }
 
-function hasTerminalLedgerState(
+export function hasTerminalLedgerState(
   probe: LedgerProbe,
   threadId: string,
 ): boolean {
@@ -84,6 +82,17 @@ function hasTerminalLedgerState(
   const lastWorking = probe.latestLedgerByVerbs(threadId, BUSY_AGE_LEDGER_VERBS);
   if (!lastWorking) return true;
   return lastTerminal.createdAtMs > lastWorking.createdAtMs;
+}
+
+function hasIntentionalPauseState(
+  probe: LedgerProbe,
+  threadId: string,
+): boolean {
+  const lastPaused = probe.latestLedgerByVerbs(threadId, ["crew.paused"]);
+  if (!lastPaused) return false;
+  const lastWorking = probe.latestLedgerByVerbs(threadId, BUSY_AGE_LEDGER_VERBS);
+  if (!lastWorking) return true;
+  return lastPaused.createdAtMs > lastWorking.createdAtMs;
 }
 
 export function shouldEnqueueBusyAgeStall(
@@ -108,5 +117,6 @@ export function shouldEnqueueStaleIdleSupervision(
   if (!shouldEnqueueStaleIdleWake(fsm)) return false;
   if (latestSemanticWorkingAtMs(probe, threadId) !== null) return false;
   if (hasTerminalLedgerState(probe, threadId)) return false;
+  if (hasIntentionalPauseState(probe, threadId)) return false;
   return !isSemanticallyBlocked(probe, threadId, hasOpenHolds);
 }

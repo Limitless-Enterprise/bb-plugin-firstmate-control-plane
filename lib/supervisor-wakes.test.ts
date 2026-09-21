@@ -159,6 +159,17 @@ describe("semantic blocked and busy-age probes", () => {
     );
   });
 
+  it("skips stale-idle when crew.paused superseded working", () => {
+    const p = probe([
+      { verb: "crew.working", createdAtMs: 1000 },
+      { verb: "crew.paused", createdAtMs: 2000 },
+    ]);
+    assert.equal(
+      shouldEnqueueStaleIdleSupervision("idle", p, "t1", false),
+      false,
+    );
+  });
+
   it("allows stale-idle after mark.idle cleared working", () => {
     const p = probe([
       { verb: "crew.working", createdAtMs: 1000 },
