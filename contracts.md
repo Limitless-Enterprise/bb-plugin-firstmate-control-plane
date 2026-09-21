@@ -91,9 +91,7 @@ Projection rules:
 
 ## Liveness verdict
 
-`alive | dead | missing | ambiguous`
-
-Never auto-respawn on `ambiguous`.
+See [contracts/README.md](./contracts/README.md#liveness-verdict) (authoritative).
 
 ## Hold
 
@@ -138,10 +136,9 @@ Never auto-respawn on `ambiguous`.
 
 ## CoS notification
 
-- Digest via `bb fleet digest [--mate <homeId>] [--tell-cos]`.
-- Bearings snapshot via `bb fleet bearings [--mate <homeId>] [--json]` (digest +
-  open holds, unacked wakes, tracked PR links).
-- Captain attention via **Fleet Inbox** only — not Command Center inbox.
+See [contracts/README.md](./contracts/README.md#cos-notification) for CLI
+surfaces (tree, board, inbox, digest, bearings). Captain attention via **Fleet
+Inbox** only — not Command Center inbox.
 
 ## Isolation
 

@@ -26,6 +26,10 @@ threads, use **`bb fleet relaunch`** or the Fleet panel overflow controls.
 `fm-control interrupt` on `backend=bb` crews uses Escape|C-c (BB `thread stop`). Other
 keys are not supported on the bb backend.
 
+After stop, bound threads (non-empty `envId` / `environmentId`) still report
+`alive` in `fm_backend_bb_agent_state` when status is `stopped` or `error`, so
+interrupt postconditions succeed while the worktree binding persists.
+
 ## Teardown
 
 Use **`bin/fm-teardown.sh`** as documented in AGENTS.md.

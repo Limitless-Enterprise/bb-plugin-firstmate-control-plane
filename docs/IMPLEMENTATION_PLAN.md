@@ -173,7 +173,9 @@ Run through **Firstmate native commands**:
 4. `fm-send <task> "…"` → delivered
 5. `working:` → FSM working through BB idle
 6. `blocked:` → mate wake + Inbox
-7. `fm-control interrupt` → works
+7. `fm-control interrupt` (or `bb fleet interrupt`) → works; bound stopped/error
+   threads stay alive for postconditions; tree/board liveness dead within probe
+   interval (`controlStop` pin holds through idle+bound env)
 8. PR status → poller + digest link
 9. `fm-teardown` → clean teardown
 10. `bb fleet digest --tell-cos` → complete

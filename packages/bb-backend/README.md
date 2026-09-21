@@ -33,6 +33,8 @@ Replace the v1 `integration/bin/fm-spawn.sh` stub with:
 
 1. `config/backend=bb`
 2. Native `bin/fm-spawn.sh` backed up under `.bb-integration/native/` and replaced by the wrapper
-3. Full `bb.sh` backend implementing capture, spawn hooks, steer, kill, agent_state
+3. Full `bb.sh` backend implementing capture, spawn hooks, steer, interrupt
+   (Escape|C-c), kill, agent_state; `fm-teardown-wrap` + treehouse shim for BB
+   teardown
 
 See `docs/IMPLEMENTATION_PLAN.md` Phase 1.

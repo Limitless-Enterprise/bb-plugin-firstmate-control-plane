@@ -95,6 +95,12 @@ Projection rules:
 
 Never auto-respawn on `ambiguous`.
 
+`bb fleet interrupt` and `bb fleet exit` pin liveness `dead` with
+`detail.controlStop: true`. While pinned, probes stay `dead` (including SDK
+`idle` with a bound `environmentId`, probe errors, and stale `active`/`running`
+reads) until relaunch or detach clears the thread. The fleet supervisor skips
+liveness inbox items when `controlStop` is set.
+
 ## Hold
 
 ```ts
