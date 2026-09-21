@@ -110,7 +110,7 @@ fm_backend_bb_agent_state() {
   )"
   env_id="$(
     printf '%s' "$json" \
-      | jq -r '.thread.environmentId // .envId // .environmentId // empty' 2>/dev/null \
+      | jq -r '.thread.environmentId // .thread.envId // .envId // .environmentId // empty' 2>/dev/null \
       || true
   )"
   case "$status" in

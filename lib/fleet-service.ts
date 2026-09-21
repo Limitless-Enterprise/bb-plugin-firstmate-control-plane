@@ -1098,11 +1098,7 @@ export class FleetService {
       const runtimeStatus = thread.runtime?.displayStatus;
       const prev = this.store.getLiveness(threadId);
       const prevDetail = prev?.detail;
-      if (
-        prevDetail?.controlStop === true &&
-        status !== "active" &&
-        status !== "running"
-      ) {
+      if (prevDetail?.controlStop === true) {
         this.store.setLiveness(threadId, node.homeId, "dead", {
           ...prevDetail,
           status,
@@ -1135,6 +1131,8 @@ export class FleetService {
       const detail: Record<string, unknown> = { error: String(error) };
       if (prevDetail?.controlStop === true) {
         detail.controlStop = true;
+        this.store.setLiveness(threadId, node.homeId, "dead", detail);
+        return "dead";
       }
       this.store.setLiveness(threadId, node.homeId, "ambiguous", detail);
       return "ambiguous";
