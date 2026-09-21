@@ -5,6 +5,7 @@ import { FleetStore } from "./db";
 import { projectFsm, verbForMark } from "./fsm";
 import {
   applyFirstmateIntegration,
+  INTEGRATION_VERSION,
   matePromptWithBbIntegration,
   runIntegrationSelfCheck,
 } from "./apply-firstmate-integration";
@@ -176,7 +177,12 @@ export class FleetService {
     const issues = reports.flatMap((report) =>
       report.issues.map((issue) => `${report.checkoutPath}: ${issue}`),
     );
-    return { ok: issues.length === 0, issues, reports };
+    return {
+      ok: issues.length === 0,
+      issues,
+      reports,
+      integrationVersion: INTEGRATION_VERSION,
+    };
   }
 
   async previewHomeCheckout(input: {
@@ -968,15 +974,20 @@ export class FleetService {
 
   resolveHold(homeId: string, holdId: string): void {
     this.assertHome(homeId);
+    const holdsBefore = this.store.listHolds(homeId, "open");
+    const hold = holdsBefore.find((candidate) => candidate.id === holdId);
     this.store.resolveHold(holdId);
-    const holds = this.store.listHolds(homeId);
-    const hold = holds.find((candidate) => candidate.id === holdId);
     if (hold) {
       this.store.upsertInboxFromHold({
         ...hold,
         state: "resolved",
         resolvedAtMs: Date.now(),
       });
+      if (!this.hasOpenHolds(homeId, hold.threadId)) {
+        this.markThread(homeId, hold.threadId, "idle", {
+          holdResolved: holdId,
+        });
+      }
     }
     this.publish();
   }
@@ -1288,6 +1299,58 @@ export class FleetService {
     }
     this.store.deleteNode(node.id);
     this.publish();
+  }
+
+  async sweepOrphans(homeId: string): Promise<{
+    removed: { threadId: string; label: string }[];
+    skipped: { threadId: string; label: string; reason: string }[];
+  }> {
+    this.assertHome(homeId);
+    const checkoutPaths = await this.mateCheckoutPaths(homeId);
+    const removed: { threadId: string; label: string }[] = [];
+    const skipped: { threadId: string; label: string; reason: string }[] =
+      [];
+
+    for (const node of this.store.listNodes(homeId)) {
+      if (node.kind === "primary") continue;
+      if (isLegacyFleetThreadId(node.threadId)) continue;
+
+      let threadMissing = false;
+      try {
+        const thread = await this.bb.sdk.threads.get({
+          threadId: node.threadId,
+        });
+        if (!thread) threadMissing = true;
+      } catch {
+        threadMissing = true;
+      }
+
+      let metaPresent = false;
+      for (const checkoutPath of checkoutPaths) {
+        const metaPath = path.join(checkoutPath, "state", `${node.label}.meta`);
+        if (await pathExists(metaPath)) {
+          metaPresent = true;
+          break;
+        }
+      }
+
+      if (!threadMissing && metaPresent) continue;
+
+      if (this.hasOpenHolds(homeId, node.threadId)) {
+        skipped.push({
+          threadId: node.threadId,
+          label: node.label,
+          reason: "open holds",
+        });
+        continue;
+      }
+
+      this.store.deleteNode(node.id);
+      removed.push({ threadId: node.threadId, label: node.label });
+    }
+
+    if (removed.length > 0) this.publish();
+    return { removed, skipped };
   }
 
   async spawnCrew(input: {

@@ -163,25 +163,44 @@ bb-plugin-firstmate-control-plane/
 
 See `docs/CAPABILITY_INVENTORY.md` for the full B-* / P-* / U-* item list (all required for M1 program; nothing optional).
 
-## 8. M1 acceptance script
+## 8. M1 acceptance criteria (full suite)
 
-Run through **Firstmate native commands**:
+Run **`scripts/m1-ac-full.sh`** after build, plugin install, and
+`bb fleet integration apply --mate <homeId>`. Set `FM_HOME` to the mate checkout
+and `MATE` to the fleet home id (default `tech`).
 
-1. `config/backend=bb`; overlay applied
-2. `fm-spawn <ship-task>` → crew in Fleet tree
-3. `fm-peek <task>` → output
-4. `fm-send <task> "…"` → delivered
-5. `working:` → FSM working through BB idle
-6. `blocked:` → mate wake + Inbox
-7. `fm-control interrupt` (or `bb fleet interrupt`) → works; bound stopped/error
-   threads stay alive for postconditions; tree/board liveness dead within probe
-   interval (`controlStop` pin holds through idle+bound env)
-8. PR status → poller + digest link
-9. `fm-teardown` → clean teardown
-10. `bb fleet digest --tell-cos` → complete
-11. `bb fleet bearings --mate <homeId>` → CoS-ready snapshot
-12. Kill process → liveness dead; ambiguous never respawns
-13. Fleet UI: tree (mobile toggle), board, inbox, relaunch/detach controls functional
+The suite maps **every phase exit criterion** plus the original §8 smoke path.
+Partial results are allowed only where the environment cannot satisfy optional
+substrate (e.g. empty fm-peek on BB).
+
+| ID | Phase | Criterion |
+|---|---|---|
+| P0-1 | 0 | `contracts/` + `contracts.md` frozen |
+| P0-2 | 0 | Monorepo: `packages/bb-backend` + Fleet plugin |
+| P0-3 | 0 | `bb fleet integration check` ok with version pin |
+| AC1 | 1 | `config/backend=bb`; overlay applied |
+| AC2 | 1 | `fm-spawn` → crew in Fleet tree |
+| AC3 | 1 | `fm-peek` returns output |
+| AC4 | 1 | `fm-send` delivers |
+| AC5 | 2 | `working:` → FSM working through BB idle |
+| AC6 | 2/5 | `blocked:` → FSM blocked + mate wake |
+| P5-1 | 5 | `bb fleet hold open` → Fleet Inbox item |
+| P5-2 | 5 | `hold resolve` → openCount 0; FSM unblocked |
+| P5-3 | 5 | `fm-teardown` refused while holds open |
+| AC7 | 4 | `fm-control interrupt` + `bb fleet interrupt`; controlStop liveness |
+| AC8 | 8 | PR URL in bearings after `done:` |
+| P8-1 | 8 | Dispatch profiles CRUD |
+| P8-2 | 8 | `bb fleet spawn --profile` sets dispatchProfileId |
+| AC9 | 10 | `fm-teardown` clean (treehouse skip, state cleared) |
+| P10-1 | 10 | `bb fleet sweep` orphan registry cleanup |
+| AC10 | 9 | `bb fleet digest --tell-cos` |
+| AC11 | 9 | `bb fleet bearings` CoS snapshot |
+| AC12 | 7 | Kill/interrupt → liveness dead; no ambiguous respawn |
+| AC13 | 3/4 | Fleet UI CLI: tree, board, inbox JSON |
+| P6-1 | 6 | Unit tests: FSM turn-end + supervisor wake matrix |
+| P11-1 | 11 | Happy-path spawn: no Herdr/tmux |
+
+Legacy **`/tmp/m1-ac-spotcheck.sh`** (13 ACs only) is superseded by this script.
 
 ## 9. Out of scope (only these)
 

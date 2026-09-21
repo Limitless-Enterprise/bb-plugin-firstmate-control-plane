@@ -39,7 +39,9 @@ export function projectFsm(
       continue;
     }
     if (ERROR_VERBS.has(verb)) {
-      state = "error";
+      if (!SEMANTIC_WORKING.has(state)) {
+        state = "error";
+      }
       continue;
     }
     if (STOPPED_VERBS.has(verb)) {

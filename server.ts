@@ -5,6 +5,10 @@ import { FLEET_CHANGED, FleetService, isLegacyFleetThreadId } from "./lib/fleet-
 import { projectFsm } from "./lib/fsm";
 import { createStatusBridge } from "./lib/status-bridge";
 import { createPrPoller } from "./lib/pr-poller";
+import {
+  shouldEnqueueBusyAgeWake,
+  shouldEnqueueStaleIdleWake,
+} from "./lib/supervisor-wakes";
 
 export type { rpcContract };
 
@@ -62,6 +66,11 @@ export default async function plugin(bb: BbPluginApi) {
       type: "string",
       label: "Busy-age stall threshold (seconds)",
       default: "900",
+    },
+    staleIdleSec: {
+      type: "string",
+      label: "Stale-idle wake threshold (seconds)",
+      default: "1800",
     },
     cosThreadId: {
       type: "string",
@@ -122,11 +131,16 @@ export default async function plugin(bb: BbPluginApi) {
       60,
       Number.parseInt(values.busyAgeSec, 10) || 900,
     );
+    const staleIdleSec = Math.max(
+      60,
+      Number.parseInt(values.staleIdleSec, 10) || 1800,
+    );
     return {
       probeIntervalMs: probeIntervalSec * 1000,
       statusBridgeIntervalMs: statusBridgeIntervalSec * 1000,
       autoRespawn: values.autoRespawn,
       busyAgeSec,
+      staleIdleSec,
       cosThreadId: values.cosThreadId.trim() || null,
     };
   };
@@ -383,13 +397,40 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.background.service("fleet-supervisor", {
     async start(signal) {
+      const SUPERVISOR_LOCK_KEY = "fleet.supervisor.lock";
+      const owner = `supervisor-${process.pid}`;
       while (!signal.aborted) {
         const config = await getConfig();
+        const now = Date.now();
+        const lock = await bb.storage.kv.get<{
+          owner: string;
+          expiresMs: number;
+        }>(SUPERVISOR_LOCK_KEY);
+        if (lock && lock.expiresMs > now && lock.owner !== owner) {
+          await new Promise<void>((resolve) => {
+            const timer = setTimeout(resolve, config.probeIntervalMs);
+            signal.addEventListener(
+              "abort",
+              () => {
+                clearTimeout(timer);
+                resolve();
+              },
+              { once: true },
+            );
+          });
+          continue;
+        }
+        await bb.storage.kv.set(SUPERVISOR_LOCK_KEY, {
+          owner,
+          expiresMs: now + config.probeIntervalMs + 2000,
+        });
+
         const homes = store.listHomes();
         for (const home of homes) {
           const nodes = store.listNodes(home.homeId);
           for (const node of nodes) {
             if (isLegacyFleetThreadId(node.threadId)) continue;
+            const fsm = fleet.fsmForThread(node.threadId);
             const verdict = await fleet.probeThread(node.threadId);
             const liveness = store.getLiveness(node.threadId);
             if (
@@ -415,20 +456,39 @@ export default async function plugin(bb: BbPluginApi) {
                 });
               }
             }
-            const entries = store.tailLedger(node.threadId, 20);
-            const lastWorking = entries.find((e) => e.verb === "mark.working");
-            if (
-              lastWorking &&
-              Date.now() - lastWorking.createdAtMs > config.busyAgeSec * 1000
-            ) {
-              store.enqueueWake({
-                homeId: home.homeId,
-                threadId: home.mateThreadId,
-                targetMateId: home.primaryMateId,
-                reason: `stall:${node.threadId}`,
-                priority: 4,
-                dedupeKey: `stall:${node.threadId}`,
-              });
+            if (shouldEnqueueBusyAgeWake(fsm)) {
+              const entries = store.tailLedger(node.threadId, 20);
+              const lastWorking = entries.find((e) => e.verb === "mark.working");
+              if (
+                lastWorking &&
+                Date.now() - lastWorking.createdAtMs > config.busyAgeSec * 1000
+              ) {
+                store.enqueueWake({
+                  homeId: home.homeId,
+                  threadId: home.mateThreadId,
+                  targetMateId: home.primaryMateId,
+                  reason: `stall:${node.threadId}`,
+                  priority: 4,
+                  dedupeKey: `stall:${node.threadId}`,
+                });
+              }
+            }
+            if (shouldEnqueueStaleIdleWake(fsm)) {
+              const entries = store.tailLedger(node.threadId, 1);
+              const last = entries[0];
+              if (
+                last &&
+                Date.now() - last.createdAtMs > config.staleIdleSec * 1000
+              ) {
+                store.enqueueWake({
+                  homeId: home.homeId,
+                  threadId: home.mateThreadId,
+                  targetMateId: home.primaryMateId,
+                  reason: `stale-idle:${node.threadId}`,
+                  priority: 3,
+                  dedupeKey: `stale-idle:${node.threadId}`,
+                });
+              }
             }
           }
         }
@@ -464,7 +524,8 @@ export default async function plugin(bb: BbPluginApi) {
     "  bb fleet steer --mate <homeId> --thread <id> --text <message>",
     "  bb fleet interrupt|exit|relaunch|detach --mate <homeId> --thread <id>",
     "  bb fleet bearings [--mate <homeId>] [--json]",
-    "  bb fleet hold open|resolve ...",
+    "  bb fleet hold open|list|resolve ...",
+    "  bb fleet sweep --mate <homeId>",
     "  bb fleet inbox [--mate <homeId>] [--json]",
     "  bb fleet inbox snooze|resolve <id> [--mate <homeId>]",
     "  bb fleet probe [--mate <homeId>] [--thread <id>]",
@@ -492,6 +553,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "relaunch", summary: "Relaunch crew thread", usage: "bb fleet relaunch ..." },
       { name: "detach", summary: "Detach crew from registry", usage: "bb fleet detach ..." },
       { name: "hold", summary: "Holds", usage: "bb fleet hold ..." },
+      { name: "sweep", summary: "Remove orphan registry nodes", usage: "bb fleet sweep ..." },
       { name: "inbox", summary: "Fleet inbox", usage: "bb fleet inbox ..." },
       { name: "probe", summary: "Liveness probe", usage: "bb fleet probe ..." },
       { name: "digest", summary: "CoS digest", usage: "bb fleet digest ..." },
@@ -770,7 +832,37 @@ export default async function plugin(bb: BbPluginApi) {
               fleet.resolveHold(id, holdId);
               return reply(null, `Resolved hold ${holdId}`);
             }
+            if (sub === "list" || sub === undefined) {
+              const thread = flags.get("thread");
+              const stateFlag = flags.get("state");
+              let holds = store.listHolds(
+                id,
+                stateFlag === "open"
+                  ? "open"
+                  : stateFlag === "resolved"
+                    ? "resolved"
+                    : undefined,
+              );
+              if (typeof thread === "string") {
+                holds = holds.filter((hold) => hold.threadId === thread);
+              }
+              const openCount = holds.filter((hold) => hold.state === "open").length;
+              return reply(
+                { holds, openCount },
+                holds.length
+                  ? holds.map((h) => `${h.id}\t${h.state}\t${h.title}`).join("\n")
+                  : "No holds.",
+              );
+            }
             break;
+          }
+          case "sweep": {
+            const id = homeId();
+            const result = await fleet.sweepOrphans(id);
+            return reply(
+              result,
+              `Removed ${result.removed.length} orphan(s); skipped ${result.skipped.length}.`,
+            );
           }
           case "inbox": {
             const id = flags.has("mate") ? homeId() : store.getSelectedHomeId();
