@@ -15,10 +15,8 @@ if [ ! -x "$NATIVE" ]; then
 fi
 
 TASK_ID=
-FORCE=
 for arg in "$@"; do
   case "$arg" in
-    --force) FORCE=1 ;;
     --legacy-record) ;;
     -*) ;;
     *)
@@ -30,10 +28,21 @@ for arg in "$@"; do
 done
 
 USE_BB_TEARDOWN=0
-if fm_bb_enabled && [ -n "$TASK_ID" ] && [ -f "$FM_ROOT/state/$TASK_ID.meta" ]; then
-  backend=$(grep '^backend=' "$FM_ROOT/state/$TASK_ID.meta" 2>/dev/null | cut -d= -f2- | head -n1 || true)
-  if [ "$backend" = bb ]; then
-    USE_BB_TEARDOWN=1
+if fm_bb_enabled && [ -n "$TASK_ID" ]; then
+  meta="$FM_ROOT/state/$TASK_ID.meta"
+  if [ -f "$meta" ]; then
+    backend=$(grep '^backend=' "$meta" 2>/dev/null | cut -d= -f2- | head -n1 || true)
+    if [ "$backend" = bb ]; then
+      USE_BB_TEARDOWN=1
+    fi
+  else
+    backlog_close="$FM_ROOT/state/${TASK_ID}.backlog-close"
+    backend_file="$FM_ROOT/config/backend"
+    if [ -e "$backlog_close" ] || [ -L "$backlog_close" ]; then
+      USE_BB_TEARDOWN=1
+    elif [ -f "$backend_file" ] && [ "$(tr -d '[:space:]' <"$backend_file")" = bb ]; then
+      USE_BB_TEARDOWN=1
+    fi
   fi
 fi
 
@@ -97,15 +106,15 @@ rc=$?
 set -e
 
 # Ad-hoc BB scouts are often absent from tasks-axi; native teardown can leave a
-# stale backlog-close marker after the task record is already gone. Treat that
-# as success when --force cleared local state.
+# stale backlog-close marker after the task record is already gone. Treat meta
+# cleared with that marker as success (AC9).
 if [ "$USE_BB_TEARDOWN" = 1 ] && [ -n "$TASK_ID" ] && [ "$rc" -ne 0 ]; then
   if [ ! -f "$FM_ROOT/state/${TASK_ID}.meta" ]; then
     backlog_close="$FM_ROOT/state/${TASK_ID}.backlog-close"
     if [ -e "$backlog_close" ] || [ -L "$backlog_close" ]; then
       rm -f "$backlog_close"
+      rc=0
     fi
-    rc=0
   fi
 fi
 
