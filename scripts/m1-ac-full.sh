@@ -25,7 +25,7 @@ wait_fsm() {
   local label=$1 want=$2 i=0 state=""
   while [ "$i" -lt 30 ]; do
     state=$(bb fleet tree --mate "$MATE" --json 2>/dev/null \
-      | jq -r --arg l "$label" '.. | objects | select(.label? == $l) | .fsmState' | head -1)
+      | jq -r --arg l "$label" '[.. | objects | select(.label? == $l)] | max_by(.createdAtMs // 0) | .fsmState // empty')
     [ "$state" = "$want" ] && return 0
     sleep 1; i=$((i + 1))
   done
@@ -35,7 +35,7 @@ wait_fsm() {
 
 tree_field() {
   bb fleet tree --mate "$MATE" --json 2>/dev/null \
-    | jq -r --arg l "$1" --arg f "$2" '.. | objects | select(.label? == $l) | .[$f]' | head -1
+    | jq -r --arg l "$1" --arg f "$2" '[.. | objects | select(.label? == $l)] | max_by(.createdAtMs // 0) | .[$f] // empty'
 }
 
 meta_thread() {

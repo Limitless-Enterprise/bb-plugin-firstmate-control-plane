@@ -9,7 +9,7 @@ FM_BB_BACKEND_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 fm_backend_bb_thread_status() {
   local tid=$1
-  bb thread get "$tid" --json 2>/dev/null \
+  bb thread show "$tid" --json 2>/dev/null \
     | jq -r '.thread.status // .status // "unknown"' 2>/dev/null \
     || printf 'unknown'
 }
@@ -91,7 +91,7 @@ fm_backend_bb_target_exists() {
   local tid
   tid="$(fm_backend_bb_thread_id_from_target "$target")"
   fm_bb_require_bb || return 1
-  bb thread get "$tid" --json >/dev/null 2>&1
+  bb thread show "$tid" --json >/dev/null 2>&1
 }
 
 fm_backend_bb_agent_state() {
@@ -102,7 +102,7 @@ fm_backend_bb_agent_state() {
     printf 'missing'
     return 0
   fi
-  json="$(bb thread get "$tid" --json 2>/dev/null || true)"
+  json="$(bb thread show "$tid" --json 2>/dev/null || true)"
   status="$(
     printf '%s' "$json" \
       | jq -r '.thread.status // .status // "unknown"' 2>/dev/null \
