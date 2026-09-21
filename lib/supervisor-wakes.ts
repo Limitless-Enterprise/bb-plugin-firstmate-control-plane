@@ -5,7 +5,7 @@ export function shouldEnqueueStaleIdleWake(fsm: FsmState): boolean {
   return fsm === "idle";
 }
 
-const BLOCKED_LEDGER_VERBS = ["mark.blocked", "hold.open", "crew.blocked"];
+const BLOCKED_LEDGER_VERBS = ["mark.blocked", "crew.blocked"];
 const IDLE_UNBLOCK_LEDGER_VERBS = ["mark.idle", "crew.resolved", "crew.paused"];
 const SUPERSEDES_WORKING_VERBS = [
   "mark.done",
@@ -13,6 +13,7 @@ const SUPERSEDES_WORKING_VERBS = [
   "task.complete",
   "control.exit",
   "control.stop",
+  "control.interrupt",
   "thread.stopped",
   "turn.failed",
   "crew.failed",
@@ -26,6 +27,7 @@ const TERMINAL_LEDGER_VERBS = [
   "task.complete",
   "control.exit",
   "control.stop",
+  "control.interrupt",
   "thread.stopped",
   "turn.failed",
   "crew.failed",

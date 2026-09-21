@@ -99,6 +99,17 @@ describe("semantic blocked and busy-age probes", () => {
     );
   });
 
+  it("does not stall when control.interrupt superseded working", () => {
+    const p = probe([
+      { verb: "crew.working", createdAtMs: 0 },
+      { verb: "control.interrupt", createdAtMs: 1000 },
+    ]);
+    assert.equal(
+      shouldEnqueueBusyAgeStall(p, "t1", false, 60, 120_000),
+      false,
+    );
+  });
+
   it("skips stale-idle when semantically blocked", () => {
     const p = probe([{ verb: "crew.blocked", createdAtMs: 500 }]);
     assert.equal(

@@ -9,7 +9,7 @@ const NATIVE_IDLE_VERBS = new Set([
 ]);
 
 const DONE_VERBS = new Set(["mark.done", "crew.done", "task.complete"]);
-const BLOCKED_VERBS = new Set(["mark.blocked", "hold.open", "crew.blocked"]);
+const BLOCKED_VERBS = new Set(["mark.blocked", "crew.blocked"]);
 const WORKING_VERBS = new Set([
   "mark.working",
   "crew.working",
