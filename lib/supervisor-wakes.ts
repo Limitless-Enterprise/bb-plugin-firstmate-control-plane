@@ -8,7 +8,6 @@ const IDLE_UNBLOCK_LEDGER_VERBS = ["mark.idle", "crew.resolved", "crew.paused"];
 const SUPERSEDES_WORKING_VERBS = [
   "mark.done",
   "crew.done",
-  "task.complete",
   "control.exit",
   "control.interrupt",
   "turn.failed",
@@ -21,7 +20,6 @@ const SUPERSEDES_WORKING_VERBS = [
 const TERMINAL_LEDGER_VERBS = [
   "mark.done",
   "crew.done",
-  "task.complete",
   "control.exit",
   "control.interrupt",
   "turn.failed",

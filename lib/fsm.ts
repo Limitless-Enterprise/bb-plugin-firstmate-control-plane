@@ -8,7 +8,7 @@ const NATIVE_IDLE_VERBS = new Set([
   "turn.end",
 ]);
 
-const DONE_VERBS = new Set(["mark.done", "crew.done", "task.complete"]);
+const DONE_VERBS = new Set(["mark.done", "crew.done"]);
 export const BLOCKED_VERBS = new Set(["mark.blocked", "crew.blocked"]);
 const WORKING_VERBS = new Set([
   "mark.working",
@@ -41,7 +41,7 @@ export function projectFsm(
       continue;
     }
     if (ERROR_VERBS.has(verb)) {
-      if (state !== "blocked") {
+      if (state !== "blocked" && state !== "done" && state !== "stopped") {
         state = "error";
       }
       continue;

@@ -181,7 +181,7 @@ absent from tasks-axi), the wrapper removes the marker and exits 0. `fm-spawn --
 `--secondmate` still use native Firstmate backends; crew relaunch on BB threads is
 via `bb fleet relaunch` or Fleet UI controls. Status bridge
 watches `<mate-checkout>/state/<id>.status` for `working:`, `done:`, `failed:`,
-`blocked:`, `paused:`, and `needs-decision:` (`resolved:` / `note:` not yet).
+`blocked:`, `paused:`, `needs-decision:`, and `resolved:` (`note:` not yet).
 PR poller watches GitHub checks.
 
 Pure CLI use: set `enabled: false` or use a checkout without the overlay.

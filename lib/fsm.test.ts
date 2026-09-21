@@ -35,6 +35,22 @@ describe("projectFsm", () => {
     assert.equal(state, "blocked");
   });
 
+  it("done beats later turn.failed", () => {
+    const state = projectFsm([
+      { verb: "crew.done", fsmState: "done" },
+      { verb: "turn.failed", fsmState: "error" },
+    ]);
+    assert.equal(state, "done");
+  });
+
+  it("stopped beats later turn.failed", () => {
+    const state = projectFsm([
+      { verb: "control.interrupt", fsmState: "stopped" },
+      { verb: "turn.failed", fsmState: "error" },
+    ]);
+    assert.equal(state, "stopped");
+  });
+
   it("working yields to later turn.failed", () => {
     const state = projectFsm([
       { verb: "crew.working", fsmState: "working" },
