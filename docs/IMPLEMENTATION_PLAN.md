@@ -53,8 +53,8 @@ bb-plugin-firstmate-control-plane/
 └── README.md
 ```
 
-**Retired (Phase 1):** v1 `integration/bin/fm-spawn.sh` stub — overlay v2 lives in
-`packages/bb-backend/overlay/` (see `lib/apply-firstmate-integration.ts`).
+**Retired (Phase 1):** v1 `integration/bin/fm-spawn.sh` stub — overlay lives in
+`packages/bb-backend/overlay/` (version in `lib/apply-firstmate-integration.ts`).
 
 ## 5. Milestones
 

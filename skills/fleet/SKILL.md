@@ -22,10 +22,11 @@ bb fleet secondmate create --mate cto --thread <threadId> --label platform-lead
 
 ## Operations
 
-- `bb fleet tree --mate cto` — fleet tree
+- `bb fleet tree --mate cto` — fleet tree (live liveness probes)
+- `bb fleet board --mate cto` — FSM lanes board (live liveness probes)
 - `bb fleet steer --mate cto --thread <id> --text "..."` — data-plane steer
 - `bb fleet interrupt|exit|relaunch|detach --mate cto --thread <id>` — control plane
-- `bb fleet inbox --mate cto` — Captain inbox
+- `bb fleet inbox --mate cto [--limit 100]` — Captain inbox (JSON: items, totalOpen, limit; max --limit 500)
 - `bb fleet digest --mate cto --tell-cos` — CoS digest
 - `bb fleet bearings --mate cto` — CoS bearings snapshot
 - `bb fleet integration apply|check --mate cto` — overlay install/verify

@@ -17,7 +17,8 @@ bb fleet home bootstrap cto --label CTO --parent /workspace/Codes
 bb fleet home create cto --label CTO --parent /workspace/Codes --thread <mateThreadId>
 bb fleet spawn --mate cto --role ship --label auth --prompt "Ship the auth fix"
 bb fleet tree --mate cto
-bb fleet inbox --mate cto
+bb fleet board --mate cto
+bb fleet inbox --mate cto [--limit 100]
 bb fleet digest --mate cto --tell-cos
 bb fleet bearings --mate cto
 bb fleet steer --mate cto --thread <threadId> --text "Continue on the PR feedback"

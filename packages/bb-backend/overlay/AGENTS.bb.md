@@ -21,23 +21,35 @@ Unsupported until M3: `--secondmate` (still uses the native backend).
 `fm-spawn --relaunch` also uses the native backend. To relaunch a crew on BB
 threads, use **`bb fleet relaunch`** or the Fleet panel overflow controls.
 
+## Control
+
+`fm-control interrupt` on `backend=bb` crews uses Escape|C-c (BB `thread stop`). Other
+keys are not supported on the bb backend.
+
 ## Teardown
 
 Use **`bin/fm-teardown.sh`** as documented in AGENTS.md.
 
 When integration is enabled and `state/<task>.meta` has `backend=bb`, the wrapper
 skips treehouse pool return (BB owns the worktree env), attempts `bb fleet detach`
-for the crew thread, then runs native teardown. Other backends (e.g. relaunch crews)
+for the crew thread, then runs native teardown. Re-run teardown with meta already
+cleared still uses the BB path when `state/<task>.backlog-close` exists or
+`config/backend=bb`. If native teardown fails after meta is gone but
+`state/<task>.backlog-close` remains, the wrapper clears that marker and exits 0
+(ad-hoc scouts often absent from tasks-axi). Other backends (e.g. relaunch crews)
 keep the normal treehouse return path.
 
 ## Visibility
 
 ```sh
 bb fleet tree --mate <homeId>
-bb fleet inbox --mate <homeId>
+bb fleet board --mate <homeId>
+bb fleet inbox --mate <homeId> [--limit 100]
 bb fleet digest --mate <homeId>
 bb fleet bearings --mate <homeId>
 ```
+
+`tree` and `board` probe liveness before returning JSON.
 
 The status bridge watches `state/<task-id>.status` on this mate checkout.
 Ledger updates: `working:`, `done:` (incl. PR URLs), `failed:`, `blocked:`,
@@ -53,7 +65,7 @@ Written by the Fleet plugin at apply time:
   "enabled": true,
   "homeId": "tech",
   "mateThreadId": "thr_…",
-  "version": 2
+  "version": 3
 }
 ```
 

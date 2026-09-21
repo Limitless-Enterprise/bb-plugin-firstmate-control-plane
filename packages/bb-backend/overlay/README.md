@@ -2,7 +2,7 @@
 
 Source files installed into a Firstmate mate checkout by
 `bb fleet integration apply` (`lib/apply-firstmate-integration.ts`,
-integration version **2**).
+integration version **3**).
 
 ## Installed layout
 
@@ -28,6 +28,7 @@ bin/
   fm-backend.sh            # → fm-backend-wrap.sh (adds bb backend)
   fm-teardown.sh           # → fm-teardown-wrap.sh (BB-aware treehouse skip)
   backends/bb.sh           # bb adapter copy
+bin/fm-control-lib.sh      # patched at apply: bb backend Escape|C-c interrupt
 config/
   backend                  # "bb"
   bb-integration.json      # { enabled, homeId, mateThreadId, version, appliedAtMs }

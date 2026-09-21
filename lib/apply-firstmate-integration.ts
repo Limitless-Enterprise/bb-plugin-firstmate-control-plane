@@ -294,7 +294,7 @@ export function matePromptWithBbIntegration(input: {
     "",
     "This checkout uses config/backend=bb (see docs/bb-integration/AGENTS.bb.md).",
     "Dispatch crews with bin/fm-spawn.sh as usual — ship/scout crews register in Fleet automatically.",
-    "Use bb fleet tree / bb fleet inbox to inspect crews; do not claim a worker is running",
+    "Use bb fleet tree / bb fleet board / bb fleet inbox to inspect crews; do not claim a worker is running",
     "unless it appears in the fleet tree or you have a bb thread id in state/<task>.meta.",
   ].join("\n");
 }

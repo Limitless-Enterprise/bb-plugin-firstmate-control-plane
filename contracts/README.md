@@ -141,6 +141,10 @@ Never auto-respawn on `ambiguous`.
 - Digest via `bb fleet digest [--mate <homeId>] [--tell-cos]`.
 - Bearings snapshot via `bb fleet bearings [--mate <homeId>] [--json]` (digest +
   open holds, unacked wakes, tracked PR links).
+- Fleet tree via `bb fleet tree [--mate <homeId>] [--json]` (probes liveness before build).
+- Status board via `bb fleet board [--mate <homeId>] [--json]` (FSM lanes; probes liveness).
+- Captain inbox via `bb fleet inbox [--mate <homeId>] [--json] [--limit N]` — JSON
+  `{ items, totalOpen, limit }`; default limit 100, max 500.
 - Captain attention via **Fleet Inbox** only — not Command Center inbox.
 
 ## Isolation
@@ -149,20 +153,25 @@ Every RPC enforces `homeId`. Cross-home reads/writes fail closed.
 
 ## Firstmate checkout overlay
 
-After clone/bootstrap, the plugin applies overlay **v2** from `packages/bb-backend/overlay/`:
+After clone/bootstrap, the plugin applies overlay **v3** from `packages/bb-backend/overlay/`:
 
 - Backs up native `bin/fm-spawn.sh`, `bin/fm-backend.sh`, and `bin/fm-teardown.sh`
   under `.bb-integration/native/` (creates `fm-backend-native.sh` alias at apply)
 - Installs wrappers as `bin/fm-spawn.sh`, `bin/fm-backend.sh`, and `bin/fm-teardown.sh`
 - Copies adapter scripts (including `treehouse` shim) into `.bb-integration/bin/`
   and `bin/backends/bb.sh`
+- Patches `bin/fm-control-lib.sh` so `fm-control interrupt` on `backend=bb` crews
+  accepts Escape|C-c (maps to `bb thread stop`)
 - Writes `config/backend` (`bb`) and `config/bb-integration.json` with
   `{ enabled, homeId, mateThreadId, version, appliedAtMs }`
 - Copies `docs/bb-integration/AGENTS.bb.md` for mate-thread instructions
 
 When `enabled: true`, ship/scout spawns call `bb fleet spawn` and register crew nodes.
-For crews with `backend=bb` in task meta, `fm-teardown` skips treehouse pool return
-and detaches the BB thread before native teardown. `fm-spawn --relaunch` and
+For crews with `backend=bb` in task meta (or re-run teardown when meta is already
+gone but `state/<task>.backlog-close` or `config/backend=bb` indicates BB), `fm-teardown`
+skips treehouse pool return, detaches the BB thread, then runs native teardown. If native
+teardown fails after meta is cleared but `state/<task>.backlog-close` remains (ad-hoc scouts
+absent from tasks-axi), the wrapper removes the marker and exits 0. `fm-spawn --relaunch` and
 `--secondmate` still use native Firstmate backends; crew relaunch on BB threads is
 via `bb fleet relaunch` or Fleet UI controls. Status bridge
 watches `<mate-checkout>/state/<id>.status` for `working:`, `done:`, `failed:`,
@@ -172,3 +181,13 @@ PR poller watches GitHub checks.
 Pure CLI use: set `enabled: false` or use a checkout without the overlay.
 
 See `packages/bb-backend/overlay/README.md` for the installed file tree.
+
+## Plugin settings (Fleet panel)
+
+| Setting | Default | Floor |
+|---|---|---|
+| `probeIntervalSec` | 10 | 5 |
+| `statusBridgeIntervalSec` | 3 | 2 |
+
+Status bridge scans mate checkout `state/*.status` on this interval; liveness probes
+run on `probeIntervalSec`.
