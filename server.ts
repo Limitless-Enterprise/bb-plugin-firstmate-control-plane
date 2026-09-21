@@ -2,12 +2,13 @@ import { type BbPluginApi } from "@get-bb/plugin-sdk";
 import { rpcContract } from "./contract";
 import { FleetStore, migrations } from "./lib/db";
 import { FLEET_CHANGED, FleetService, isLegacyFleetThreadId } from "./lib/fleet-service";
-import { BUSY_AGE_LEDGER_VERBS, projectFsm } from "./lib/fsm";
+import { projectFsm } from "./lib/fsm";
 import { createStatusBridge } from "./lib/status-bridge";
 import { createPrPoller } from "./lib/pr-poller";
 import {
-  shouldEnqueueBusyAgeWake,
-  shouldEnqueueStaleIdleWake,
+  isSemanticallyBlocked,
+  shouldEnqueueBusyAgeStall,
+  shouldEnqueueStaleIdleSupervision,
 } from "./lib/supervisor-wakes";
 
 export type { rpcContract };
@@ -318,14 +319,19 @@ export default async function plugin(bb: BbPluginApi) {
     const threadId = event.threadId;
     const node = store.getNodeByThread(threadId);
     if (!node) return;
-    const preFsm = fleet.fsmForThread(threadId);
     store.appendLedger({
       homeId: node.homeId,
       threadId,
       verb: "turn.failed",
       fsmState: "error",
     });
-    if (preFsm !== "blocked") {
+    if (
+      !isSemanticallyBlocked(
+        store,
+        threadId,
+        fleet.hasOpenHolds(node.homeId, threadId),
+      )
+    ) {
       store.enqueueWake({
         homeId: node.homeId,
         threadId,
@@ -459,26 +465,31 @@ export default async function plugin(bb: BbPluginApi) {
                 });
               }
             }
-            if (shouldEnqueueBusyAgeWake(fsm)) {
-              const lastWorking = store.latestLedgerByVerbs(
+            if (
+              shouldEnqueueBusyAgeStall(
+                store,
                 node.threadId,
-                BUSY_AGE_LEDGER_VERBS,
-              );
-              if (
-                lastWorking &&
-                Date.now() - lastWorking.createdAtMs > config.busyAgeSec * 1000
-              ) {
-                store.enqueueWake({
-                  homeId: home.homeId,
-                  threadId: home.mateThreadId,
-                  targetMateId: home.primaryMateId,
-                  reason: `stall:${node.threadId}`,
-                  priority: 4,
-                  dedupeKey: `stall:${node.threadId}`,
-                });
-              }
+                fleet.hasOpenHolds(home.homeId, node.threadId),
+                config.busyAgeSec,
+              )
+            ) {
+              store.enqueueWake({
+                homeId: home.homeId,
+                threadId: home.mateThreadId,
+                targetMateId: home.primaryMateId,
+                reason: `stall:${node.threadId}`,
+                priority: 4,
+                dedupeKey: `stall:${node.threadId}`,
+              });
             }
-            if (shouldEnqueueStaleIdleWake(fsm)) {
+            if (
+              shouldEnqueueStaleIdleSupervision(
+                fsm,
+                store,
+                node.threadId,
+                fleet.hasOpenHolds(home.homeId, node.threadId),
+              )
+            ) {
               const entries = store.tailLedger(node.threadId, 1);
               const last = entries[0];
               if (
