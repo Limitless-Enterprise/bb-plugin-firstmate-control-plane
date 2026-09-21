@@ -58,7 +58,7 @@ async function patchControlLibForBb(checkoutPath: string): Promise<void> {
       ;;`;
   const supportsReplacement = `${supportsNeedle}
     bb)
-      case "$key" in Escape|Enter|C-c) return 0 ;; esac
+      case "$key" in Escape|C-c) return 0 ;; esac
       ;;`;
   if (!content.includes(supportsNeedle)) {
     throw new Error(
