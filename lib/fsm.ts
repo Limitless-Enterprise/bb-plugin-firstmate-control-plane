@@ -16,6 +16,8 @@ const WORKING_VERBS = new Set([
   "steer.sent",
   "turn.start",
 ]);
+
+export const BUSY_AGE_LEDGER_VERBS = new Set([...WORKING_VERBS, "mark.starting"]);
 const ERROR_VERBS = new Set(["turn.failed", "mark.error", "liveness.dead"]);
 const STOPPED_VERBS = new Set(["control.exit", "control.stop", "thread.stopped"]);
 

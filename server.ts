@@ -2,7 +2,7 @@ import { type BbPluginApi } from "@get-bb/plugin-sdk";
 import { rpcContract } from "./contract";
 import { FleetStore, migrations } from "./lib/db";
 import { FLEET_CHANGED, FleetService, isLegacyFleetThreadId } from "./lib/fleet-service";
-import { projectFsm } from "./lib/fsm";
+import { BUSY_AGE_LEDGER_VERBS, projectFsm } from "./lib/fsm";
 import { createStatusBridge } from "./lib/status-bridge";
 import { createPrPoller } from "./lib/pr-poller";
 import {
@@ -458,8 +458,8 @@ export default async function plugin(bb: BbPluginApi) {
             }
             if (shouldEnqueueBusyAgeWake(fsm)) {
               const entries = store.tailLedger(node.threadId, 20);
-              const lastWorking = entries.find(
-                (e) => e.verb === "mark.working" || e.verb === "mark.starting",
+              const lastWorking = entries.find((e) =>
+                BUSY_AGE_LEDGER_VERBS.has(e.verb),
               );
               if (
                 lastWorking &&
