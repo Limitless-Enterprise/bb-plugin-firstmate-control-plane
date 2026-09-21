@@ -457,7 +457,7 @@ export default async function plugin(bb: BbPluginApi) {
               }
             }
             if (shouldEnqueueBusyAgeWake(fsm)) {
-              const entries = store.tailLedger(node.threadId, 20);
+              const entries = store.tailLedger(node.threadId, 200);
               const lastWorking = entries.find((e) =>
                 BUSY_AGE_LEDGER_VERBS.has(e.verb),
               );
