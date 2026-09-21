@@ -456,6 +456,44 @@ export class FleetStore {
     return id;
   }
 
+  latestLedgerByVerbs(
+    threadId: string,
+    verbs: Iterable<string>,
+  ): {
+    id: string;
+    verb: string;
+    fsmState: string;
+    detail: Record<string, unknown> | null;
+    createdAtMs: number;
+  } | null {
+    const verbList = [...verbs];
+    if (verbList.length === 0) return null;
+    const placeholders = verbList.map(() => "?").join(", ");
+    const row = this.db
+      .prepare(
+        `SELECT id, verb, fsm_state AS fsmState, detail_json AS detailJson, created_at_ms AS createdAtMs
+         FROM ledger WHERE thread_id = ? AND verb IN (${placeholders})
+         ORDER BY created_at_ms DESC LIMIT 1`,
+      )
+      .get(threadId, ...verbList) as
+      | {
+          id: string;
+          verb: string;
+          fsmState: string;
+          detailJson: string | null;
+          createdAtMs: number;
+        }
+      | undefined;
+    if (!row) return null;
+    return {
+      id: row.id,
+      verb: row.verb,
+      fsmState: row.fsmState,
+      detail: row.detailJson ? JSON.parse(row.detailJson) : null,
+      createdAtMs: row.createdAtMs,
+    };
+  }
+
   tailLedger(threadId: string, limit = 50): {
     id: string;
     verb: string;

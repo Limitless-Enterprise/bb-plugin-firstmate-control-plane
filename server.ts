@@ -318,28 +318,31 @@ export default async function plugin(bb: BbPluginApi) {
     const threadId = event.threadId;
     const node = store.getNodeByThread(threadId);
     if (!node) return;
+    const preFsm = fleet.fsmForThread(threadId);
     store.appendLedger({
       homeId: node.homeId,
       threadId,
       verb: "turn.failed",
       fsmState: "error",
     });
-    store.enqueueWake({
-      homeId: node.homeId,
-      threadId,
-      targetMateId: store.getHome(node.homeId)?.primaryMateId ?? null,
-      reason: "turn.failed",
-      priority: 8,
-      dedupeKey: `turn.failed:${threadId}`,
-    });
-    store.createInboxItem({
-      homeId: node.homeId,
-      threadId,
-      kind: "wake",
-      urgency: "high",
-      title: "Turn failed",
-      body: `Thread ${threadId} failed a turn.`,
-    });
+    if (preFsm !== "blocked") {
+      store.enqueueWake({
+        homeId: node.homeId,
+        threadId,
+        targetMateId: store.getHome(node.homeId)?.primaryMateId ?? null,
+        reason: "turn.failed",
+        priority: 8,
+        dedupeKey: `turn.failed:${threadId}`,
+      });
+      store.createInboxItem({
+        homeId: node.homeId,
+        threadId,
+        kind: "wake",
+        urgency: "high",
+        title: "Turn failed",
+        body: `Thread ${threadId} failed a turn.`,
+      });
+    }
     fleet.publish();
   });
 
@@ -457,9 +460,9 @@ export default async function plugin(bb: BbPluginApi) {
               }
             }
             if (shouldEnqueueBusyAgeWake(fsm)) {
-              const entries = store.tailLedger(node.threadId, 200);
-              const lastWorking = entries.find((e) =>
-                BUSY_AGE_LEDGER_VERBS.has(e.verb),
+              const lastWorking = store.latestLedgerByVerbs(
+                node.threadId,
+                BUSY_AGE_LEDGER_VERBS,
               );
               if (
                 lastWorking &&
