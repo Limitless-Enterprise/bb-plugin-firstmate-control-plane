@@ -711,24 +711,46 @@ export class FleetStore {
     };
   }
 
-  listInbox(homeId: string, state?: InboxState): InboxItem[] {
+  listInbox(homeId: string, state?: InboxState, limit?: number): InboxItem[] {
+    const capped =
+      limit !== undefined
+        ? Math.min(500, Math.max(1, Math.trunc(limit)))
+        : undefined;
     const rows = (state
-      ? this.db
-          .prepare(
-            `SELECT id, home_id AS homeId, hold_id AS holdId, thread_id AS threadId, kind,
+      ? capped !== undefined
+        ? this.db
+            .prepare(
+              `SELECT id, home_id AS homeId, hold_id AS holdId, thread_id AS threadId, kind,
+             urgency, title, body, state, snoozed_until_ms AS snoozedUntilMs,
+             created_at_ms AS createdAtMs, resolved_at_ms AS resolvedAtMs
+             FROM inbox WHERE home_id = ? AND state = ? ORDER BY created_at_ms DESC LIMIT ?`,
+            )
+            .all(homeId, state, capped)
+        : this.db
+            .prepare(
+              `SELECT id, home_id AS homeId, hold_id AS holdId, thread_id AS threadId, kind,
              urgency, title, body, state, snoozed_until_ms AS snoozedUntilMs,
              created_at_ms AS createdAtMs, resolved_at_ms AS resolvedAtMs
              FROM inbox WHERE home_id = ? AND state = ? ORDER BY created_at_ms DESC`,
-          )
-          .all(homeId, state)
-      : this.db
-          .prepare(
-            `SELECT id, home_id AS homeId, hold_id AS holdId, thread_id AS threadId, kind,
+            )
+            .all(homeId, state)
+      : capped !== undefined
+        ? this.db
+            .prepare(
+              `SELECT id, home_id AS homeId, hold_id AS holdId, thread_id AS threadId, kind,
+             urgency, title, body, state, snoozed_until_ms AS snoozedUntilMs,
+             created_at_ms AS createdAtMs, resolved_at_ms AS resolvedAtMs
+             FROM inbox WHERE home_id = ? ORDER BY created_at_ms DESC LIMIT ?`,
+            )
+            .all(homeId, capped)
+        : this.db
+            .prepare(
+              `SELECT id, home_id AS homeId, hold_id AS holdId, thread_id AS threadId, kind,
              urgency, title, body, state, snoozed_until_ms AS snoozedUntilMs,
              created_at_ms AS createdAtMs, resolved_at_ms AS resolvedAtMs
              FROM inbox WHERE home_id = ? ORDER BY created_at_ms DESC`,
-          )
-          .all(homeId)) as InboxItem[];
+            )
+            .all(homeId)) as InboxItem[];
     return rows;
   }
 

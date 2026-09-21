@@ -7,7 +7,7 @@ import { pathExists, pathIsGitCheckout } from "./firstmate-checkout";
 
 const execFileAsync = promisify(execFile);
 
-export const INTEGRATION_VERSION = 2;
+export const INTEGRATION_VERSION = 3;
 
 const PLUGIN_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -46,6 +46,38 @@ const OVERLAY_FILES = [
   "bin/treehouse",
   "bin/backends/bb.sh",
 ] as const;
+
+async function patchControlLibForBb(checkoutPath: string): Promise<void> {
+  const libPath = path.join(checkoutPath, "bin", "fm-control-lib.sh");
+  const marker = "# firstmate-control-plane BB integration";
+  let content = await fs.readFile(libPath, "utf8");
+  if (content.includes(marker)) return;
+
+  const supportsNeedle = `    tmux|herdr|zellij|cmux)
+      case "$key" in Escape|Enter|C-c|C-u) return 0 ;; esac
+      ;;`;
+  const supportsReplacement = `${supportsNeedle}
+    bb)
+      case "$key" in Escape|Enter|C-c) return 0 ;; esac
+      ;;`;
+  if (!content.includes(supportsNeedle)) {
+    throw new Error(
+      `Cannot patch fm-control-lib.sh for bb backend: supports_key anchor missing in ${libPath}`,
+    );
+  }
+  content = content.replace(supportsNeedle, supportsReplacement);
+
+  const verifiedNeedle = `    tmux|herdr) return 0 ;;`;
+  const verifiedReplacement = `    tmux|herdr|bb) return 0 ;; ${marker}`;
+  if (!content.includes(verifiedNeedle)) {
+    throw new Error(
+      `Cannot patch fm-control-lib.sh for bb backend: state_verified anchor missing in ${libPath}`,
+    );
+  }
+  content = content.replace(verifiedNeedle, verifiedReplacement);
+
+  await fs.writeFile(libPath, content, "utf8");
+}
 
 async function copyFileExecutable(src: string, dest: string): Promise<void> {
   await fs.mkdir(path.dirname(dest), { recursive: true });
@@ -193,6 +225,7 @@ export async function applyFirstmateIntegration(
     "bin/backends/bb.sh",
     "bin/backends/bb.sh",
   );
+  await patchControlLibForBb(checkoutPath);
 
   const docsDir = path.join(checkoutPath, "docs", "bb-integration");
   await fs.mkdir(docsDir, { recursive: true });

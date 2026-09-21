@@ -15,9 +15,11 @@ if [ ! -x "$NATIVE" ]; then
 fi
 
 TASK_ID=
+FORCE=
 for arg in "$@"; do
   case "$arg" in
-    --force|--legacy-record) ;;
+    --force) FORCE=1 ;;
+    --legacy-record) ;;
     -*) ;;
     *)
       if [ -z "$TASK_ID" ]; then
@@ -89,4 +91,22 @@ link_native_teardown_libs "$FM_ROOT/bin" "$(dirname "$NATIVE")"
 export FM_ROOT_OVERRIDE="$FM_ROOT"
 export FM_HOME="${FM_HOME:-$FM_ROOT}"
 
-exec "$NATIVE" "$@"
+set +e
+"$NATIVE" "$@"
+rc=$?
+set -e
+
+# Ad-hoc BB scouts are often absent from tasks-axi; native teardown can leave a
+# stale backlog-close marker after the task record is already gone. Treat that
+# as success when --force cleared local state.
+if [ "$USE_BB_TEARDOWN" = 1 ] && [ -n "$TASK_ID" ] && [ "$rc" -ne 0 ]; then
+  if [ ! -f "$FM_ROOT/state/${TASK_ID}.meta" ]; then
+    backlog_close="$FM_ROOT/state/${TASK_ID}.backlog-close"
+    if [ -e "$backlog_close" ] || [ -L "$backlog_close" ]; then
+      rm -f "$backlog_close"
+    fi
+    rc=0
+  fi
+fi
+
+exit "$rc"

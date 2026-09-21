@@ -7,6 +7,13 @@ FM_BB_BACKEND_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=../fm-bb-lib.sh
 . "$FM_BB_BACKEND_ROOT/.bb-integration/bin/fm-bb-lib.sh"
 
+fm_backend_bb_thread_status() {
+  local tid=$1
+  bb thread get "$tid" --json 2>/dev/null \
+    | jq -r '.thread.status // .status // "unknown"' 2>/dev/null \
+    || printf 'unknown'
+}
+
 fm_backend_bb_thread_id_from_target() {
   local target=$1
   case "$target" in
@@ -34,8 +41,22 @@ fm_backend_bb_visible_capture() {
 }
 
 fm_backend_bb_send_key() {
-  echo "error: bb backend does not support raw key injection" >&2
-  return 1
+  local target=$1 key=$2 _label=${3-} _retries=${4-} _sleep=${5-} _settle=${6-}
+  local tid
+  tid="$(fm_backend_bb_thread_id_from_target "$target")"
+  fm_bb_require_bb || return 1
+  case "$key" in
+    Escape|C-c)
+      # BB has no raw terminal keys; stop cancels an in-flight turn without
+      # retiring the thread, matching fm-control's interrupt semantics.
+      bb thread stop "$tid" >/dev/null 2>&1 || return 1
+      return 0
+      ;;
+    *)
+      echo "error: bb backend does not support key '$key'" >&2
+      return 1
+      ;;
+  esac
 }
 
 fm_backend_bb_send_text_submit() {
@@ -81,12 +102,10 @@ fm_backend_bb_agent_state() {
     printf 'missing'
     return 0
   fi
-  status="$(bb thread get "$tid" --json 2>/dev/null | jq -r '.status // "unknown"' || printf 'unreadable')"
+  status="$(fm_backend_bb_thread_status "$tid")"
   case "$status" in
-    active|running) printf 'alive' ;;
-    idle) printf 'alive' ;;
-    error|failed) printf 'dead' ;;
-    stopping) printf 'ambiguous' ;;
+    active|running|idle|starting|stopping) printf 'alive' ;;
+    error|failed|stopped) printf 'dead' ;;
     *) printf 'unknown' ;;
   esac
 }
@@ -103,7 +122,7 @@ fm_backend_bb_busy_state() {
   local target=$1
   local tid status
   tid="$(fm_backend_bb_thread_id_from_target "$target")"
-  status="$(bb thread get "$tid" --json 2>/dev/null | jq -r '.status // "unknown"' || printf 'unknown')"
+  status="$(fm_backend_bb_thread_status "$tid")"
   case "$status" in
     active|running) printf 'busy' ;;
     idle) printf 'idle' ;;

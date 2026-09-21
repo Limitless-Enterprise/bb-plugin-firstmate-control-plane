@@ -211,7 +211,10 @@ fm_backend_composer_state() {
 fm_backend_target_exists() {
   local backend=$1 target=$2
   case "$backend" in
-    bb) fm_backend_bb_target_exists "$target" ;;
+    bb)
+      fm_backend_source bb || return 1
+      fm_backend_bb_target_exists "$target"
+      ;;
     tmux)
       tmux display-message -p -t "$target" '#{pane_id}' >/dev/null 2>&1
       ;;

@@ -51,7 +51,7 @@ export default async function plugin(bb: BbPluginApi) {
     probeIntervalSec: {
       type: "string",
       label: "Liveness probe interval (seconds)",
-      default: "60",
+      default: "10",
     },
     autoRespawn: {
       type: "boolean",
@@ -67,6 +67,11 @@ export default async function plugin(bb: BbPluginApi) {
       type: "string",
       label: "CoS thread id for digest delivery (optional)",
       default: "",
+    },
+    statusBridgeIntervalSec: {
+      type: "string",
+      label: "Status bridge scan interval (seconds)",
+      default: "3",
     },
     firstmateRepoUrl: {
       type: "string",
@@ -106,8 +111,12 @@ export default async function plugin(bb: BbPluginApi) {
   const getConfig = async () => {
     const values = await settings.get();
     const probeIntervalSec = Math.max(
-      15,
-      Number.parseInt(values.probeIntervalSec, 10) || 60,
+      5,
+      Number.parseInt(values.probeIntervalSec, 10) || 10,
+    );
+    const statusBridgeIntervalSec = Math.max(
+      2,
+      Number.parseInt(values.statusBridgeIntervalSec, 10) || 3,
     );
     const busyAgeSec = Math.max(
       60,
@@ -115,6 +124,7 @@ export default async function plugin(bb: BbPluginApi) {
     );
     return {
       probeIntervalMs: probeIntervalSec * 1000,
+      statusBridgeIntervalMs: statusBridgeIntervalSec * 1000,
       autoRespawn: values.autoRespawn,
       busyAgeSec,
       cosThreadId: values.cosThreadId.trim() || null,
@@ -322,6 +332,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.background.service("fleet-status-bridge", {
     async start(signal) {
       while (!signal.aborted) {
+        const config = await getConfig();
         for (const home of store.listHomes()) {
           try {
             const checkoutPaths = await fleet.mateCheckoutPaths(home.homeId);
@@ -331,7 +342,7 @@ export default async function plugin(bb: BbPluginApi) {
           }
         }
         await new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, 15_000);
+          const timer = setTimeout(resolve, config.statusBridgeIntervalMs);
           signal.addEventListener(
             "abort",
             () => {
@@ -586,8 +597,21 @@ export default async function plugin(bb: BbPluginApi) {
           }
           case "tree": {
             const id = homeId();
+            const nodes = store.listNodes(id);
+            await Promise.all(
+              nodes.map((node) => fleet.probeThread(node.threadId)),
+            );
             const tree = fleet.buildTree(id);
             return reply({ tree }, JSON.stringify(tree, null, 2));
+          }
+          case "board": {
+            const id = homeId();
+            const nodes = store.listNodes(id);
+            await Promise.all(
+              nodes.map((node) => fleet.probeThread(node.threadId)),
+            );
+            const board = fleet.buildBoard(id);
+            return reply(board, JSON.stringify(board, null, 2));
           }
           case "crew": {
             if (sub === "attach") {
@@ -760,9 +784,15 @@ export default async function plugin(bb: BbPluginApi) {
               fleet.publish();
               return reply(null, `Resolved ${itemId}`);
             }
-            const items = store.listInbox(id, "open");
+            const limitRaw = flags.get("limit");
+            const limit =
+              typeof limitRaw === "string"
+                ? Math.min(500, Math.max(1, Number.parseInt(limitRaw, 10) || 100))
+                : 100;
+            const items = store.listInbox(id, "open", limit);
+            const totalOpen = store.countOpenInbox(id);
             return reply(
-              items,
+              { items, totalOpen, limit },
               items.length
                 ? items.map((item) => `${item.id}\t${item.title}`).join("\n")
                 : "Inbox empty.",

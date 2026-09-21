@@ -262,6 +262,84 @@ export class FleetService {
     return [toTree(primary, 0)];
   }
 
+  buildBoard(homeId: string): {
+    homeId: string;
+    generatedAtMs: number;
+    lanes: {
+      title: string;
+      nodes: {
+        id: string;
+        label: string;
+        kind: FleetNode["kind"];
+        fsmState: FsmState;
+        liveness: LivenessVerdict | null;
+        role: FleetNode["role"];
+        threadId: string;
+      }[];
+    }[];
+  } {
+    this.assertHome(homeId);
+    const tree = this.buildTree(homeId);
+    const flat: {
+      id: string;
+      label: string;
+      kind: FleetNode["kind"];
+      fsmState: FsmState;
+      liveness: LivenessVerdict | null;
+      role: FleetNode["role"];
+      threadId: string;
+    }[] = [];
+    const walk = (nodes: TreeNode[]) => {
+      for (const node of nodes) {
+        flat.push({
+          id: node.id,
+          label: node.label,
+          kind: node.kind,
+          fsmState: node.fsmState,
+          liveness: node.liveness,
+          role: node.role,
+          threadId: node.threadId,
+        });
+        walk(node.children);
+      }
+    };
+    walk(tree);
+    const lanes = [
+      {
+        title: "Working",
+        match: (node: (typeof flat)[number]) => node.fsmState === "working",
+      },
+      {
+        title: "Blocked",
+        match: (node: (typeof flat)[number]) => node.fsmState === "blocked",
+      },
+      {
+        title: "Idle",
+        match: (node: (typeof flat)[number]) =>
+          node.fsmState === "idle" || node.fsmState === "starting",
+      },
+      {
+        title: "Done",
+        match: (node: (typeof flat)[number]) => node.fsmState === "done",
+      },
+      {
+        title: "Failed|Unknown",
+        match: (node: (typeof flat)[number]) =>
+          node.fsmState === "error" ||
+          node.fsmState === "unknown" ||
+          node.fsmState === "stopped",
+      },
+    ];
+    return {
+      homeId,
+      generatedAtMs: Date.now(),
+      lanes: lanes.map(({ title, match }) => ({
+        title,
+        nodes: flat.filter(match),
+      })),
+    };
+  }
+
   markThread(
     homeId: string,
     threadId: string,
@@ -1017,10 +1095,24 @@ export class FleetService {
         return "missing";
       }
       const status = thread.status;
+      const runtimeStatus = thread.runtime?.displayStatus;
       let verdict: LivenessVerdict = "alive";
-      if (status === "error") verdict = "dead";
-      else if (status === "stopping") verdict = "ambiguous";
-      this.store.setLiveness(threadId, node.homeId, verdict, { status });
+      if (status === "error" || status === "stopping") {
+        verdict = "dead";
+      } else if (
+        node.kind !== "primary" &&
+        status === "idle" &&
+        !thread.environmentId &&
+        runtimeStatus === "idle"
+      ) {
+        // BB thread stop releases the runtime but leaves the thread id idle.
+        verdict = "dead";
+      }
+      this.store.setLiveness(threadId, node.homeId, verdict, {
+        status,
+        runtimeStatus,
+        environmentId: thread.environmentId,
+      });
       return verdict;
     } catch (error) {
       this.store.setLiveness(threadId, node.homeId, "ambiguous", {
@@ -1062,6 +1154,7 @@ export class FleetService {
   async interrupt(homeId: string, threadId: string): Promise<void> {
     this.assertHome(homeId);
     await this.bb.sdk.threads.stop({ threadId });
+    await this.probeThread(threadId);
     this.store.appendLedger({
       homeId,
       threadId,
