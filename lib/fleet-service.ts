@@ -70,8 +70,14 @@ function wakeTiedToCrewThread(
   if (key === `pr.ready:${crewThreadId}`) return true;
   if (key === `pr.green:${crewThreadId}`) return true;
   if (key === `pr.failed:${crewThreadId}`) return true;
+  if (key === `liveness:${crewThreadId}`) return true;
+  if (key === `stall:${crewThreadId}`) return true;
+  if (key === `stale-idle:${crewThreadId}`) return true;
+  if (key === `turn.failed:${crewThreadId}`) return true;
   return false;
 }
+
+export { wakeTiedToCrewThread };
 
 export function isLegacyFleetThreadId(threadId: string): boolean {
   return threadId.startsWith("legacy:");

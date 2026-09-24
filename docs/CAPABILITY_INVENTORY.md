@@ -4,7 +4,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 
 **Legend:** ✅ done · 🔲 not done · ⚠ partial
 
-**Last aligned:** 2026-09-24 (`feat/m1-inventory-complete` — partial ⚠ rows in progress)
+**Last aligned:** 2026-09-24 (`feat/m1-inventory-complete` — partials batch 2 tests)
 
 ---
 
@@ -20,7 +20,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | B-W4 | validate_spawn → fleet home + bb-integration.json | ✓ | ⚠ |
 | B-W5 | Explicit-only backend (no auto-detect) | ✓ | ✅ |
 | B-W6 | Meta schema (bb_thread_id, bb_env_id, window, worktree) | ✓ | ✅ |
-| B-W7 | validate_task_endpoint BB arm | ✓ | ⚠ |
+| B-W7 | validate_task_endpoint BB arm | ✓ | ✅ |
 | B-W8 | docs/bb-backend.md + AGENTS.bb.md | ✓ | ✅ |
 | B-W9 | Apply to canonical + mate worktree | ✓ | ✅ |
 | B-W10 | Version pin overlay ↔ plugin | ✓ | ✅ |
@@ -32,8 +32,8 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | B-S1 | Full native spawn pipeline | ✓ | ⚠ |
 | B-S2 | bb fleet spawn → thread + worktree | ✓ | ✅ |
 | B-S3 | Launch brief in BB thread | ✓ | ✅ |
-| B-S4 | Delivery mode + yolo passthrough | ✓ | ⚠ |
-| B-S5 | Dispatch profile passthrough | ✓ | ⚠ |
+| B-S4 | Delivery mode + yolo passthrough | ✓ | ✅ |
+| B-S5 | Dispatch profile passthrough | ✓ | ✅ |
 | B-S6 | --relaunch | ✓ | ⚠ |
 | B-S7 | --secondmate | M3 | 🔲 |
 | B-S8 | Batch spawn | ✓ | 🔲 |
@@ -50,8 +50,8 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | B-O5 | send_key | ✓ | ⚠ |
 | B-O6 | kill | ✓ | ✅ |
 | B-O7 | busy_state | ✓ | ⚠ |
-| B-O8 | composer_state (proxy) | ✓ | ⚠ |
-| B-O9 | visible_capture (fail-closed) | ✓ | ⚠ |
+| B-O8 | composer_state (proxy) | ✓ | ✅ |
+| B-O9 | visible_capture (fail-closed) | ✓ | ✅ |
 | B-O10 | has_push / wait_transition | ✓ | 🔲 |
 | B-O11 | commit/clear_transition | ✓ | 🔲 |
 
@@ -71,7 +71,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | ID | Capability | M1 | Status |
 |---|---|---|---|
 | B-ST1 | Ingest state/<id>.status | ✓ | ✅ |
-| B-ST2 | All status verbs | ✓ | ⚠ |
+| B-ST2 | All status verbs | ✓ | ✅ |
 | B-ST3 | OPEN DECISIONS fold | ✓ | ✅ |
 | B-ST4 | Status vs backlog divergence | ✓ | 🔲 |
 | B-ST5 | PR ready lines → poller | ✓ | ✅ |
@@ -102,9 +102,9 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-D1 | fleet spawn API | ✓ | ✅ |
 | P-D2 | Parent thread linkage | ✓ | ✅ |
 | P-D3 | Dispatch profiles CRUD | ✓ | ✅ |
-| P-D4 | Default profile per home | ✓ | ⚠ |
+| P-D4 | Default profile per home | ✓ | ✅ |
 | P-D5 | Per-crew profile override | ✓ | ✅ |
-| P-D6 | Delivery mode + yolo on spawn | ✓ | ⚠ |
+| P-D6 | Delivery mode + yolo on spawn | ✓ | ✅ |
 | P-D7 | CLI profiles + --profile | ✓ | ✅ |
 | P-D8 | Max concurrency / dispatch wait | ✓ | 🔲 |
 
@@ -152,19 +152,19 @@ Nothing in this list is optional for the full program. M1 completes items throug
 |---|---|---|---|
 | P-V1 | bb fleet probe / liveness | ✓ | ✅ |
 | P-V2 | Verdicts alive/dead/missing/ambiguous | ✓ | ✅ |
-| P-V3 | Full probe pipeline | ✓ | ⚠ |
+| P-V3 | Full probe pipeline | ✓ | ✅ |
 | P-V4 | Desync reconciliation | ✓ | 🔲 |
 | P-V5 | Never respawn ambiguous | ✓ | ✅ |
-| P-V6 | Auto-respawn dead/missing | ✓ | ⚠ |
-| P-V7 | Respawn respects holds/dirty | ✓ | ⚠ |
-| P-V8 | Idempotent respawn keys | ✓ | ⚠ |
-| P-V9 | Teardown identity proof | ✓ | ⚠ |
+| P-V6 | Auto-respawn dead/missing | ✓ | ✅ |
+| P-V7 | Respawn respects holds/dirty | ✓ | ✅ |
+| P-V8 | Idempotent respawn keys | ✓ | ✅ |
+| P-V9 | Teardown identity proof | ✓ | ✅ |
 
 ### Steering & control
 
 | ID | Capability | M1 | Status |
 |---|---|---|---|
-| P-S1 | bb fleet steer | ✓ | ⚠ |
+| P-S1 | bb fleet steer | ✓ | ✅ |
 | P-S2 | Block on interaction.pending | ✓ | ✅ |
 | P-S3 | Steer queue while busy | ✓ | 🔲 |
 | P-S4 | Wait-until-ready | ✓ | 🔲 |
@@ -189,8 +189,8 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-H8 | Fleet Inbox tab | ✓ | ✅ |
 | P-H9 | Inbox filters | ✓ | 🔲 |
 | P-H10 | Snooze / resolve / reply | ✓ | ⚠ |
-| P-H11 | Deep links /fleet/inbox | ✓ | ⚠ |
-| P-H12 | Nav badge inbox count | ✓ | ⚠ |
+| P-H11 | Deep links /fleet/inbox | ✓ | ✅ |
+| P-H12 | Nav badge inbox count | ✓ | ✅ |
 | P-H13 | CLI inbox | ✓ | ✅ |
 | P-H14 | Needs-decision rail strip | ✓ | ⚠ |
 
@@ -199,8 +199,8 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | ID | Capability | M1 | Status |
 |---|---|---|---|
 | P-P1 | Parse done: PR | ✓ | ✅ |
-| P-P2 | PR/CI poller | ✓ | ⚠ |
-| P-P3 | Checks pending/green/failed wakes | ✓ | ⚠ |
+| P-P2 | PR/CI poller | ✓ | ✅ |
+| P-P3 | Checks pending/green/failed wakes | ✓ | ✅ |
 | P-P4 | Mode-aware ready | ✓ | ✅ |
 | P-P5 | Merge outcome retire poll | ✓ | 🔲 |
 | P-P6 | Held for merge | ✓ | 🔲 |
@@ -216,7 +216,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-U2 | Status board tab | ✓ | ✅ |
 | P-U3 | StatusDot ← FSM | ✓ | ✅ |
 | P-U4 | Liveness pip | ✓ | ✅ |
-| P-U5 | Mode + profile + PR chips | ✓ | ⚠ |
+| P-U5 | Mode + profile + PR chips | ✓ | ✅ |
 | P-U6 | Ship/scout badges | ✓ | ✅ |
 | P-U7 | Deep link /fleet/<threadId> | ✓ | ✅ |
 | P-U8 | Mobile drawer | ✓ | ⚠ |
@@ -225,7 +225,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-U11 | Spawn UI profile picker | ✓ | 🔲 |
 | P-U12 | Overflow interrupt/exit/relaunch | ✓ | ⚠ |
 | P-U13 | Composer steer in panel | ✓ | ⚠ |
-| P-U14 | Nav badges (inbox/wakes/dead) | ✓ | ⚠ |
+| P-U14 | Nav badges (inbox/wakes/dead) | ✓ | ✅ |
 | P-U15 | Home switcher | M2 | ⚠ |
 | P-U16 | Unified cross-home inbox | M2 | 🔲 |
 | P-U17 | Secondmate indent tree | M3 | 🔲 |
@@ -237,9 +237,9 @@ Nothing in this list is optional for the full program. M1 completes items throug
 |---|---|---|---|
 | P-C1 | bb fleet digest | ✓ | ✅ |
 | P-C2 | bb fleet bearings | ✓ | ✅ |
-| P-C3 | Full digest builder | ✓ | ⚠ |
+| P-C3 | Full digest builder | ✓ | ✅ |
 | P-C4 | CoS notify mate down | ✓ | ✅ |
-| P-C5 | Fleet snapshot API | ✓ | ⚠ |
+| P-C5 | Fleet snapshot API | ✓ | ✅ |
 
 ---
 

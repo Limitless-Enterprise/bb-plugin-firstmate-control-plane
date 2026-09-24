@@ -123,6 +123,91 @@ describe("spawnCrew launch brief (B-S3)", () => {
     assert.ok(sendIdx < insertIdx);
   });
 
+  it("uses home default dispatch profile when profileId omitted (P-D4)", async () => {
+    let spawnModel: string | undefined;
+    const nodes = new Map<string, FleetNode>([
+      [
+        "mate-1",
+        {
+          id: "mate-1",
+          homeId: "tech",
+          kind: "primary",
+          parentId: null,
+          threadId: "thr_mate",
+          label: "cto",
+          role: null,
+          envId: null,
+          deliveryMode: "no-mistakes",
+          yolo: false,
+          dispatchProfileId: null,
+          createdAtMs: 1,
+        },
+      ],
+    ]);
+    const fleet2 = new FleetService(
+      {
+        sdk: {
+          projects: { list: async () => [{ id: "proj-1", kind: "standard" }] },
+          hosts: { list: async () => [{ id: "host-1" }] },
+          environments: {
+            create: async () => ({ id: "env-1", path: "/wt" }),
+          },
+          threads: {
+            get: async () => ({ id: "thr_mate", projectId: "proj-1" }),
+            spawn: async (input: { model?: string }) => {
+              spawnModel = input.model;
+              return { id: "thr_spawned", environmentId: "env-1" };
+            },
+            send: async () => {},
+            stop: async () => {},
+            archive: async () => {},
+          },
+        },
+        log: { warn: () => {} },
+        realtime: { publish: () => {} },
+      } as never,
+      {
+        getHome: () => ({ ...HOME, defaultProfileId: "prof-1" }),
+        listProfiles: () => [
+          {
+            id: "prof-1",
+            homeId: "tech",
+            label: "Ship",
+            providerId: "openai",
+            model: "gpt-test",
+            effort: null,
+            taskClasses: [],
+          },
+        ],
+        getNode: (id: string) => nodes.get(id),
+        getNodeByThread: () => undefined,
+        appendLedger: () => {},
+        insertNode: (input: Omit<FleetNode, "id" | "createdAtMs">) => {
+          const node: FleetNode = {
+            ...input,
+            id: "n-new",
+            createdAtMs: 1,
+          };
+          nodes.set(node.id, node);
+          return node;
+        },
+      } as never,
+    );
+    await fleet2.spawnCrew({
+      homeId: "tech",
+      label: "alpha",
+      role: "ship",
+      prompt: "work",
+      deliveryMode: "direct-PR",
+      yolo: true,
+    });
+    assert.equal(spawnModel, "gpt-test");
+    const attached = [...nodes.values()].find((n) => n.threadId === "thr_spawned");
+    assert.equal(attached?.deliveryMode, "direct-PR");
+    assert.equal(attached?.yolo, true);
+    assert.equal(attached?.dispatchProfileId, "prof-1");
+  });
+
   it("stops and archives spawned thread when send fails", async () => {
     const { fleet, bbEvents, nodes } = spawnFleet({
       sendError: new Error("send failed"),

@@ -11,6 +11,10 @@ import {
   shouldEnqueueStaleIdleSupervision,
 } from "./lib/supervisor-wakes";
 import { onThreadIdle } from "./lib/thread-idle-wake";
+import {
+  livenessWakeDedupeKey,
+  shouldSupervisorRespawnWake,
+} from "./lib/respawn-policy";
 
 export type { rpcContract };
 
@@ -464,14 +468,24 @@ export default async function plugin(bb: BbPluginApi) {
                 title: `${node.label} ${verdict}`,
                 body: `Liveness probe returned ${verdict}.`,
               });
-              if (config.autoRespawn) {
+              if (
+                shouldSupervisorRespawnWake({
+                  autoRespawn: config.autoRespawn,
+                  verdict,
+                  controlStop: liveness?.detail?.controlStop === true,
+                  hasOpenHolds: fleet.hasOpenHolds(
+                    home.homeId,
+                    node.threadId,
+                  ),
+                })
+              ) {
                 store.enqueueWake({
                   homeId: home.homeId,
                   threadId: home.mateThreadId,
                   targetMateId: home.primaryMateId,
                   reason: `liveness.${verdict}:${node.threadId}`,
                   priority: 9,
-                  dedupeKey: `liveness:${node.threadId}`,
+                  dedupeKey: livenessWakeDedupeKey(node.threadId),
                 });
               }
             }

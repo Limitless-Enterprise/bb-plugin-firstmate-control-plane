@@ -100,4 +100,58 @@ describe("fleet digest and bearings (P-C4, B-ST3)", () => {
       bearings.lines.some((line) => line.includes("Open decisions (1): pick auth model")),
     );
   });
+
+  it("builds full digest node summary (P-C3)", () => {
+    const store = {
+      getHome: (homeId: string) => (homeId === HOME.homeId ? HOME : undefined),
+      listNodes: () => [
+        {
+          id: "mate-1",
+          homeId: "tech",
+          kind: "primary" as const,
+          parentId: null,
+          threadId: "thr_mate",
+          label: "cto",
+          role: null,
+          envId: null,
+          deliveryMode: "no-mistakes" as const,
+          yolo: false,
+          dispatchProfileId: null,
+          createdAtMs: 1,
+        },
+        {
+          id: "n-crew",
+          homeId: "tech",
+          kind: "crew" as const,
+          parentId: "mate-1",
+          threadId: "thr_crew",
+          label: "ship-1",
+          role: "ship" as const,
+          envId: null,
+          deliveryMode: "no-mistakes" as const,
+          yolo: false,
+          dispatchProfileId: null,
+          createdAtMs: 2,
+        },
+      ],
+      tailLedger: (threadId: string) =>
+        threadId === "thr_crew"
+          ? [{ verb: "crew.working", fsmState: "working" }]
+          : [],
+      listProfiles: () => [],
+      getLiveness: () => null,
+      countOpenInbox: () => 1,
+      listWakes: () => [{ acked: false }],
+      listHolds: () => [],
+    };
+    const fleet = new FleetService(
+      { sdk: {}, log: {}, realtime: { publish: () => {} } } as never,
+      store as never,
+    );
+    const digest = fleet.buildDigest("tech");
+    assert.equal(digest.nodes.length, 2);
+    assert.equal(digest.openInbox, 1);
+    assert.equal(digest.unackedWakes, 1);
+    assert.match(digest.summary, /1 working/);
+  });
 });

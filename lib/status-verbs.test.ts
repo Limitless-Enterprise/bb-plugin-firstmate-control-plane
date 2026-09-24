@@ -16,6 +16,23 @@ describe("parseStatusLine", () => {
     assert.equal(parsed.detail, "implementing auth fix");
   });
 
+  it("parses all M1 status prefixes (B-ST2)", () => {
+    for (const prefix of [
+      "working:",
+      "done:",
+      "failed:",
+      "blocked:",
+      "paused:",
+      "needs-decision:",
+      "resolved:",
+      "note:",
+    ]) {
+      const parsed = parseStatusLine(`${prefix} sample`);
+      assert.ok(parsed, prefix);
+      assert.equal(parsed!.prefix, prefix);
+    }
+  });
+
   it("returns null for unknown prefixes", () => {
     assert.equal(parseStatusLine("random: noise"), null);
   });

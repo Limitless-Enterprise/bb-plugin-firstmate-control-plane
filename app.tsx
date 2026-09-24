@@ -446,9 +446,16 @@ function FleetPage({ subPath }: { subPath?: string }) {
         <Icon name="Ship" className="size-4 text-muted-foreground" />
         <span className="text-sm font-semibold">Fleet</span>
         {badge.count > 0 ? (
-          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-300">
+          <button
+            type="button"
+            className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-500/30"
+            onClick={() => {
+              setTab("inbox");
+              navigate.toPluginPanel("fleet", { subPath: "inbox" });
+            }}
+          >
             {badge.count} inbox
-          </span>
+          </button>
         ) : null}
         {badge.wakes > 0 ? (
           <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-xs text-blue-700 dark:text-blue-300">
