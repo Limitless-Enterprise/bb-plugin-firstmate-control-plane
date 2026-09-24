@@ -915,24 +915,6 @@ export class FleetStore {
       .run(kvKey, JSON.stringify(list));
   }
 
-  listDecisions(homeId: string): {
-    threadId: string;
-    key: string;
-    raw: string;
-    resolvedAtMs: number;
-  }[] {
-    const row = this.db
-      .prepare("SELECT value FROM kv WHERE key = ?")
-      .get(`decisions:${homeId}`) as { value: string } | undefined;
-    if (!row) return [];
-    return JSON.parse(row.value) as {
-      threadId: string;
-      key: string;
-      raw: string;
-      resolvedAtMs: number;
-    }[];
-  }
-
   countUnackedWakes(homeId: string): number {
     const row = this.db
       .prepare(

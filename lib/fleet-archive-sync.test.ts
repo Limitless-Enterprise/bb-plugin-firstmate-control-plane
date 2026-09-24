@@ -217,6 +217,23 @@ describe("Fleet archive sync (P-SYNC-1)", () => {
     assert.equal(nodes.size, 0);
   });
 
+  it("clears snoozed inbox on BB archive close-out", () => {
+    const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
+    const { fleet, store } = mockFleetService(nodes);
+    const item = store.createInboxItem({
+      homeId: "tech",
+      threadId: "thr_crew",
+      kind: "wake",
+      title: "Turn failed",
+      body: "failed",
+    });
+    item.state = "snoozed";
+    item.snoozedUntilMs = Date.now() + 3600_000;
+    assert.equal(fleet.closeOutRegistryForArchivedThread("thr_crew"), true);
+    assert.equal(item.state, "resolved");
+    assert.ok(item.resolvedAtMs != null);
+  });
+
   it("clears open inbox and unacked wakes on BB archive close-out", () => {
     const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
     const openHold: Hold = {

@@ -340,19 +340,6 @@ export const rpcContract = defineRpcContract({
       dead: z.number(),
     }),
   },
-  listDecisions: {
-    input: z.object({ homeId: z.string() }),
-    output: z.object({
-      decisions: z.array(
-        z.object({
-          threadId: z.string(),
-          key: z.string(),
-          raw: z.string(),
-          resolvedAtMs: z.number(),
-        }),
-      ),
-    }),
-  },
   status: {
     input: z.object({ homeId: z.string().optional() }),
     output: z.object({

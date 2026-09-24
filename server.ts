@@ -282,9 +282,6 @@ export default async function plugin(bb: BbPluginApi) {
     bearings: (input) => fleet.buildBearings(input.homeId),
     fleetSnapshot: (input) => fleet.fleetSnapshot(input.homeId),
     fleetNavCounts: (input) => fleet.fleetNavCounts(input.homeId),
-    listDecisions: (input) => ({
-      decisions: fleet.listDecisions(input.homeId),
-    }),
     status: (input) => {
       const homeId = input.homeId ?? store.getSelectedHomeId();
       const homes = store.listHomes();

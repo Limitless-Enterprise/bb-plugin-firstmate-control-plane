@@ -1045,11 +1045,6 @@ export class FleetService {
     if (ids.length > 0) this.publish();
   }
 
-  listDecisions(homeId: string) {
-    this.assertHome(homeId);
-    return this.store.listDecisions(homeId);
-  }
-
   fleetSnapshot(homeId: string): {
     digest: Digest;
     bearings: Bearings;
@@ -1371,8 +1366,8 @@ export class FleetService {
     crewThreadId: string,
     resolvedHoldIds: readonly string[],
   ): void {
-    for (const item of this.store.listInbox(homeId, "open")) {
-      if (item.threadId === crewThreadId) {
+    for (const item of this.store.listInbox(homeId)) {
+      if (item.threadId === crewThreadId && item.state !== "resolved") {
         this.store.resolveInbox(item.id);
       }
     }
