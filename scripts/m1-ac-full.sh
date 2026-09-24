@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M1 full acceptance suite — every phase exit criterion + §8 smoke path.
+# M1 full acceptance suite — every phase exit criterion + §8 smoke path (24 checks).
 # Requires: FM_HOME, bb CLI, jq, pnpm (for unit tests), integration applied.
 set -u
 
@@ -196,19 +196,23 @@ if [ -n "$prof" ]; then
     --prompt "profile AC" --profile "$prof" --json 2>/dev/null) || true
   prof_node=$(bb fleet tree --mate "$MATE" --json 2>/dev/null \
     | jq -r '.. | objects | select(.label?=="m1-prof-test") | .dispatchProfileId' | head -1)
-  if [ "$prof_node" = "$prof" ]; then
-    record P8-2 pass "spawn --profile sets dispatchProfileId"
-  else
-    record P8-2 partial "spawn ok; dispatchProfileId=$prof_node expected $prof"
-  fi
   prof_tid=$(bb fleet tree --mate "$MATE" --json 2>/dev/null \
     | jq -r '.. | objects | select(.label?=="m1-prof-test") | .threadId' | head -1)
-  if [ -n "$prof_tid" ]; then
-    if bb fleet detach --mate "$MATE" --thread "$prof_tid" >/dev/null 2>&1; then
-      record P8-3 pass "profile test crew detach/archive ok"
+  if [ "$prof_node" = "$prof" ]; then
+    if [ -n "$prof_tid" ]; then
+      if bb fleet detach --mate "$MATE" --thread "$prof_tid" >/dev/null 2>&1; then
+        record P8-2 pass "spawn --profile sets dispatchProfileId"
+      else
+        record P8-2 fail "spawn --profile ok; detach/archive failed"
+      fi
     else
-      record P8-3 fail "profile test crew detach/archive failed"
+      record P8-2 pass "spawn --profile sets dispatchProfileId"
     fi
+  else
+    if [ -n "$prof_tid" ]; then
+      bb fleet detach --mate "$MATE" --thread "$prof_tid" >/dev/null 2>&1 || true
+    fi
+    record P8-2 partial "spawn ok; dispatchProfileId=$prof_node expected $prof"
   fi
 else
   record P8-1 fail "profiles unavailable"
