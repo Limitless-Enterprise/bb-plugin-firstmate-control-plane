@@ -4,7 +4,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 
 **Legend:** ✅ done · 🔲 not done · ⚠ partial
 
-**Last aligned:** 2026-09-21 (`feat/m1-complete` — full AC suite in `scripts/m1-ac-full.sh`)
+**Last aligned:** 2026-09-24 (`feat/m1-inventory-complete` — inventory gate is authoritative AC)
 
 ---
 
@@ -93,6 +93,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-R6 | Bootstrap auto-apply | ✓ | ✅ |
 | P-R7 | Project/repo binding | ✓ | ⚠ |
 | P-R8 | Orphan sweep | ✓ | ✅ |
+| P-SYNC-1 | BB archive ↔ Fleet close-out | ✓ | ✅ |
 
 ### Spawn & dispatch
 

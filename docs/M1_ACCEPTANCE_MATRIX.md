@@ -1,0 +1,41 @@
+# M1 acceptance matrix (authoritative)
+
+**Rule:** M1 is complete only when every row in `docs/CAPABILITY_INVENTORY.md` marked **M1 ✓** is **✅** and `scripts/m1-inventory-gate.sh` passes.
+
+The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it is not sufficient alone.
+
+## Verification kinds
+
+| Kind | Meaning |
+|------|---------|
+| **live** | `scripts/m1-ac-full.sh` or `m1-ac-live-*` against `tech` mate |
+| **unit** | `pnpm test` |
+| **lint** | `pnpm run typecheck` + repo linters |
+| **doc** | File present and matches behavior |
+
+## Sync (added M1 requirement)
+
+| ID | Capability | Verify |
+|----|------------|--------|
+| P-SYNC-1 | BB `thread.archived` → Fleet registry close-out | unit + live: archive child thread → node removed from tree |
+| P-SYNC-2 | Fleet `detach` / teardown path → BB `threads.archive` | live: detach → thread archived (not deleted) |
+
+## Inventory traceability
+
+Every **B-***, **P-***, and **U-*** row in `CAPABILITY_INVENTORY.md` with M1 ✓ must have:
+
+1. Status **✅** in the inventory table, and  
+2. A row in this file’s appendix (generated checklist) pointing to **live**, **unit**, or **doc** evidence.
+
+Run `./scripts/m1-inventory-gate.sh` before merge to `main`.
+
+## Appendix: gate command
+
+```bash
+export FM_HOME=…/firstmate-tech
+export MATE=tech
+pnpm run build && bb plugin install path:$(pwd) --yes
+bb fleet integration apply --mate "$MATE"
+./scripts/m1-ac-full.sh
+./scripts/m1-inventory-gate.sh
+```

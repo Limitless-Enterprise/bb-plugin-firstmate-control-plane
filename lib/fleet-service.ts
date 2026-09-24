@@ -1280,6 +1280,31 @@ export class FleetService {
     return updated;
   }
 
+  /** Close Fleet registry row when BB archives a crew/secondmate thread (P-SYNC-1). */
+  closeOutRegistryForArchivedThread(threadId: string): boolean {
+    const node = this.store.getNodeByThread(threadId);
+    if (!node || node.kind === "primary") return false;
+    this.store.appendLedger({
+      homeId: node.homeId,
+      threadId,
+      verb: "thread.archived",
+      fsmState: "stopped",
+      detail: { source: "bb.thread.archived" },
+    });
+    this.store.deleteNode(node.id);
+    this.publish();
+    return true;
+  }
+
+  async archiveBbThread(threadId: string): Promise<void> {
+    if (isLegacyFleetThreadId(threadId)) return;
+    try {
+      await this.bb.sdk.threads.archive({ threadId });
+    } catch (error) {
+      this.bb.log.warn(`fleet: archive BB thread ${threadId} failed: ${error}`);
+    }
+  }
+
   async detachCrew(homeId: string, threadId: string): Promise<void> {
     this.assertHome(homeId);
     const node = this.store.getNodeByThread(threadId);
@@ -1299,6 +1324,7 @@ export class FleetService {
     }
     this.store.deleteNode(node.id);
     this.publish();
+    await this.archiveBbThread(threadId);
   }
 
   async sweepOrphans(homeId: string): Promise<{

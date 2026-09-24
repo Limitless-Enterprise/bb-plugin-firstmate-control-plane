@@ -303,6 +303,11 @@ export default async function plugin(bb: BbPluginApi) {
     inboxBadge: () => ({ count: store.countOpenInbox() }),
   });
 
+  bb.events.on("thread.archived", async (event) => {
+    const threadId = event.thread.id;
+    fleet.closeOutRegistryForArchivedThread(threadId);
+  });
+
   bb.events.on("thread.idle", async (event) => {
     const threadId = event.thread.id;
     const node = store.getNodeByThread(threadId);
