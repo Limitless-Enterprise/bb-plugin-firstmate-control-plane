@@ -49,7 +49,7 @@ bb-plugin-firstmate-control-plane/
 │   ├── control-plane/     # BB plugin (TS)
 │   └── bb-backend/        # Firstmate overlay: bin/backends/bb.sh
 ├── contracts/             # Shared schemas
-├── docs/                  # This plan, runbooks, upstream RFC draft
+├── docs/                  # Plan, inventory, M1 matrix, docs/upstream/ (U1–U3)
 └── README.md
 ```
 
@@ -60,7 +60,7 @@ bb-plugin-firstmate-control-plane/
 
 | Milestone | Phases | Proof |
 |---|---|---|
-| **M1 — Single mate home** | 0–11 | `cto`: backend + full plugin + UI + inbox + digest + board |
+| **M1 — Single mate home** | 0–11 | All M1 ✓ inventory rows ✅ + `scripts/m1-inventory-gate.sh` (see §8) |
 | **M2 — Multi mate homes** | 12 | Peer `cfo`; isolation |
 | **M3 — Lead secondmate** | 13 | Primary → lead → sub-crews per home |
 | **M4 — Sign-off** | 14–15 | Checklists; upstream RFC |
@@ -155,7 +155,7 @@ bb-plugin-firstmate-control-plane/
 
 ### Phase 11 — M1 proof
 
-- Acceptance script (see §8)
+- Inventory gate + smoke scripts (see §8)
 - Zero Herdr/tmux verification
 - Fix book-call-funnel visibility if work remains
 

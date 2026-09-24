@@ -253,11 +253,13 @@ P-M5–P-M8, B-S7, P-U17 — see Phase 13.
 
 ## Upstream proposal (parallel)
 
+Doc deliverables under `docs/upstream/` (not M1 ✓ product rows; doc evidence suffices).
+
 | ID | Deliverable | Status |
 |---|---|---|
-| U1 | RFC: config/backends.d/ | ✅ |
-| U2 | Backend adapter interface doc | ✅ |
-| U3 | Extension manifest capability | ✅ |
+| U1 | [RFC: config/backends.d/](./upstream/rfc-config-backends-d.md) | ✅ |
+| U2 | [Backend adapter interface doc](./upstream/backend-adapter-interface.md) | ✅ |
+| U3 | [Extension manifest capability](./upstream/extension-manifest-capability.md) | ✅ |
 | U4 | No BB code in Firstmate core | ✅ policy |
 
 ---
