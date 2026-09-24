@@ -9,7 +9,7 @@ The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it 
 | Kind | Meaning |
 |------|---------|
 | **live** | `scripts/m1-ac-full.sh` or `m1-ac-live-*` against `tech` mate |
-| **unit** | `pnpm test` (`lib/*.test.ts` + `scripts/bb-backend-m1-contract.sh` for overlay B-O8/B-O9/B-O10 fail-closed, B-W4 validate_spawn, B-O1/B-O5/B-O7 with stub `bb`). Partial-row evidence (still ⚠ in inventory): B-ST2 bridge gaps in `status-bridge.test.ts`; P-P2/P-P3 `PrPoller.pollHome` in `pr-poller.test.ts`; P-R7 mate `projectId` on `spawnCrew` in `fleet-spawn-crew.test.ts` |
+| **unit** | `pnpm test` (`lib/*.test.ts` for promoted **M1 ✓** capabilities; `scripts/bb-backend-m1-contract.sh` for overlay B-O8/B-O9/B-O10 fail-closed, B-W4 validate_spawn, B-O1/B-O5/B-O7 with stub `bb`; `scripts/spawn-wrap-m1-contract.sh` for native spawn wraps). Batch 5 closed all **M1 ✓** **⚠** rows (zero partials); gate still exits 1 while **M1 ✓** **🔲** rows remain |
 | **lint** | `pnpm run typecheck` + repo linters |
 | **doc** | File present and matches behavior |
 
@@ -21,7 +21,7 @@ The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it 
 
 ## Inventory traceability
 
-Every **B-*** and **P-*** row in `CAPABILITY_INVENTORY.md` with **M1 ✓** must be **✅** in the inventory table. Run `./scripts/m1-inventory-gate.sh` before merge to `main`.
+Every **B-*** and **P-*** row in `CAPABILITY_INVENTORY.md` with **M1 ✓** must be **✅** in the inventory table before M1 is complete. **`🔲` not-done rows are expected** until those capabilities ship; `./scripts/m1-inventory-gate.sh` fails on any **M1 ✓** **🔲** or **⚠** row. Run it before merge to `main`.
 
 **Integrity:** Do not mark **M1 ✓** inventory rows ✅ without executable evidence
 (unit test, `scripts/m1-ac-full.sh` check, or live mate verification). Doc-only
