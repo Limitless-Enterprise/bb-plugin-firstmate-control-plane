@@ -1284,6 +1284,11 @@ export class FleetService {
   closeOutRegistryForArchivedThread(threadId: string): boolean {
     const node = this.store.getNodeByThread(threadId);
     if (!node || node.kind === "primary") return false;
+    for (const hold of this.store
+      .listHolds(node.homeId, "open")
+      .filter((candidate) => candidate.threadId === threadId)) {
+      this.resolveHold(node.homeId, hold.id);
+    }
     this.store.appendLedger({
       homeId: node.homeId,
       threadId,
@@ -1302,6 +1307,7 @@ export class FleetService {
       await this.bb.sdk.threads.archive({ threadId });
     } catch (error) {
       this.bb.log.warn(`fleet: archive BB thread ${threadId} failed: ${error}`);
+      throw error;
     }
   }
 
@@ -1322,9 +1328,9 @@ export class FleetService {
     } catch {
       // thread may already be stopped
     }
+    await this.archiveBbThread(threadId);
     this.store.deleteNode(node.id);
     this.publish();
-    await this.archiveBbThread(threadId);
   }
 
   async sweepOrphans(homeId: string): Promise<{

@@ -17,19 +17,13 @@ The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it 
 
 | ID | Capability | Verify |
 |----|------------|--------|
-| P-SYNC-1 | BB `thread.archived` → Fleet registry close-out | unit + live: archive child thread → node removed from tree |
-| P-SYNC-2 | Fleet `detach` / teardown path → BB `threads.archive` | live: detach → thread archived (not deleted) |
+| P-SYNC-1 | BB ↔ Fleet close-out (`thread.archived` → registry; `detachCrew` → BB archive) | unit: `fleet-archive-sync.test.ts`; live: archive child thread → node removed; detach → thread archived (not deleted) |
 
 ## Inventory traceability
 
-Every **B-***, **P-***, and **U-*** row in `CAPABILITY_INVENTORY.md` with M1 ✓ must have:
+Every **B-***, **P-***, and **U-*** row in `CAPABILITY_INVENTORY.md` with M1 ✓ must be **✅** in the inventory table. Run `./scripts/m1-inventory-gate.sh` before merge to `main`.
 
-1. Status **✅** in the inventory table, and  
-2. A row in this file’s appendix (generated checklist) pointing to **live**, **unit**, or **doc** evidence.
-
-Run `./scripts/m1-inventory-gate.sh` before merge to `main`.
-
-## Appendix: gate command
+## Gate command
 
 ```bash
 export FM_HOME=…/firstmate-tech

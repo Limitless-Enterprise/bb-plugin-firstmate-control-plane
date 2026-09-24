@@ -35,6 +35,9 @@ function mockFleetService(nodes: Map<string, FleetNode>): {
         }
       }
     },
+    listHolds(): never[] {
+      return [];
+    },
   };
   const fleet = new FleetService(
     {
