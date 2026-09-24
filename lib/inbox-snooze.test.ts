@@ -34,4 +34,27 @@ describe("inbox snooze resurface (P-H10)", () => {
     assert.equal(open[0]?.state, "open");
     assert.equal(store.countOpenInbox("tech"), 1);
   });
+
+  it("resolveInbox removes item from open counts", () => {
+    const store = memoryStore();
+    store.upsertHome({
+      homeId: "tech",
+      label: "tech",
+      checkoutPath: "/tmp/tech",
+      primaryMateId: "mate",
+      mateThreadId: "thr_mate",
+      defaultProfileId: null,
+    });
+    const item = store.createInboxItem({
+      homeId: "tech",
+      threadId: "thr_crew",
+      kind: "wake",
+      title: "needs you",
+      body: "reply",
+    });
+    assert.equal(store.countOpenInbox("tech"), 1);
+    store.resolveInbox(item.id);
+    assert.equal(store.listInbox("tech", "open").length, 0);
+    assert.equal(store.countOpenInbox("tech"), 0);
+  });
 });

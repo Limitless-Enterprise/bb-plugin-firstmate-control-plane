@@ -214,4 +214,44 @@ describe("StatusBridge scan (M1 bridge gaps)", () => {
       ),
     );
   });
+
+  it("skips unchanged status files using mtime cursor (P-L6)", async () => {
+    const checkout = await checkoutWithStatus("t1", "working: first pass");
+    const { bridge, ledger } = bridgeHarness({});
+    assert.equal(await bridge.scanMateHome(HOME.homeId, [checkout]), 1);
+    assert.equal(ledger.filter((row) => row.verb === "crew.working").length, 1);
+    assert.equal(await bridge.scanMateHome(HOME.homeId, [checkout]), 0);
+    assert.equal(ledger.filter((row) => row.verb === "crew.working").length, 1);
+  });
+
+  it("ingests working: and paused: status verbs (B-ST2)", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "fm-status-"));
+    tempRoots.push(root);
+    const stateDir = path.join(root, "state");
+    await fs.mkdir(stateDir, { recursive: true });
+    await fs.writeFile(
+      path.join(stateDir, "t-work.status"),
+      "working: shipping\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(stateDir, "t-work.meta"),
+      "bb_thread_id=thr_crew\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(stateDir, "t-pause.status"),
+      "paused: lunch\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(stateDir, "t-pause.meta"),
+      "bb_thread_id=thr_crew\n",
+      "utf8",
+    );
+    const { bridge, ledger } = bridgeHarness({});
+    await bridge.scanMateHome(HOME.homeId, [root]);
+    assert.ok(ledger.some((row) => row.verb === "crew.working"));
+    assert.ok(ledger.some((row) => row.verb === "crew.paused"));
+  });
 });

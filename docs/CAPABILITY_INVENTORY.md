@@ -4,7 +4,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 
 **Legend:** ✅ done · 🔲 not done · ⚠ partial
 
-**Last aligned:** 2026-09-24 (`feat/m1-inventory-complete` — partials batch 2 tests)
+**Last aligned:** 2026-09-24 (`feat/m1-inventory-complete` — batch 3 P-L6/P-H10)
 
 ---
 
@@ -117,7 +117,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-L3 | Ingest Firstmate status verbs | ✓ | ✅ |
 | P-L4 | bb fleet mark | ✓ | ✅ |
 | P-L5 | thread.* → wakes | ✓ | ✅ |
-| P-L6 | Unread status cursor | ✓ | ⚠ |
+| P-L6 | Unread status cursor | ✓ | ✅ |
 | P-L7 | RECORD DIVERGENCE | ✓ | 🔲 |
 | P-L8 | Progress-only touch | ✓ | 🔲 |
 
@@ -188,7 +188,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-H7 | Authority escalation → CoS | ✓ | 🔲 |
 | P-H8 | Fleet Inbox tab | ✓ | ✅ |
 | P-H9 | Inbox filters | ✓ | 🔲 |
-| P-H10 | Snooze / resolve / reply | ✓ | ⚠ |
+| P-H10 | Snooze / resolve / reply | ✓ | ✅ |
 | P-H11 | Deep links /fleet/inbox | ✓ | ⚠ |
 | P-H12 | Nav badge inbox count | ✓ | ✅ |
 | P-H13 | CLI inbox | ✓ | ✅ |
