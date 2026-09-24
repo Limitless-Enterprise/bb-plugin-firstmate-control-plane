@@ -26,15 +26,15 @@ export function wakeIdsToAckThrough(
 ): string[] {
   const target = wakes.find((wake) => wake.id === wakeId);
   if (!target || target.acked) return [];
-  const prefix = dedupePrefix(target.dedupeKey);
+  const targetKey = target.dedupeKey;
   const ids = new Set<string>([wakeId]);
-  if (prefix) {
-    for (const wake of wakes) {
-      if (wake.acked) continue;
-      const key = wake.dedupeKey;
-      if (!key) continue;
-      if (key === prefix || key.startsWith(`${prefix}:`)) ids.add(wake.id);
-    }
+  if (!targetKey) return [...ids];
+  const childPrefix = `${targetKey}:`;
+  for (const wake of wakes) {
+    if (wake.acked) continue;
+    const key = wake.dedupeKey;
+    if (!key) continue;
+    if (key === targetKey || key.startsWith(childPrefix)) ids.add(wake.id);
   }
   return [...ids];
 }

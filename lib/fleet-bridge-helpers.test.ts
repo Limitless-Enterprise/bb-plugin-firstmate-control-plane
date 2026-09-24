@@ -41,7 +41,7 @@ describe("shouldEnqueuePrReadyWake (P-P4)", () => {
 });
 
 describe("wakeIdsToAckThrough (P-W3)", () => {
-  it("acks all wakes sharing dedupe prefix", () => {
+  it("acks target wake and dedupe suffix variants only", () => {
     const ids = wakeIdsToAckThrough(
       [
         { id: "a", dedupeKey: "pr.green:thr1", acked: false },
@@ -51,6 +51,17 @@ describe("wakeIdsToAckThrough (P-W3)", () => {
       "a",
     );
     assert.deepEqual(ids.sort(), ["a", "b"]);
+  });
+
+  it("does not ack unrelated keys sharing a segment before the first colon", () => {
+    const ids = wakeIdsToAckThrough(
+      [
+        { id: "a", dedupeKey: "hold:aaa", acked: false },
+        { id: "b", dedupeKey: "hold:bbb", acked: false },
+      ],
+      "a",
+    );
+    assert.deepEqual(ids, ["a"]);
   });
 });
 

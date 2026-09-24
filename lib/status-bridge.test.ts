@@ -1,0 +1,190 @@
+import assert from "node:assert/strict";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
+import { afterEach, describe, it } from "node:test";
+import { StatusBridge } from "./status-bridge";
+import type { FleetNode } from "./types";
+
+const HOME = {
+  homeId: "tech",
+  label: "tech",
+  checkoutPath: "/tmp/tech",
+  primaryMateId: "mate-1",
+  mateThreadId: "thr_mate",
+  defaultProfileId: null,
+  createdAtMs: 1,
+};
+
+const CREW: FleetNode = {
+  id: "n-crew",
+  homeId: "tech",
+  kind: "crew",
+  parentId: null,
+  threadId: "thr_crew",
+  label: "ship-1",
+  role: "ship",
+  envId: null,
+  deliveryMode: "no-mistakes",
+  yolo: false,
+  dispatchProfileId: null,
+  createdAtMs: 1,
+};
+
+let tempRoots: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(tempRoots.map((root) => fs.rm(root, { recursive: true, force: true })));
+  tempRoots = [];
+});
+
+async function checkoutWithStatus(
+  taskId: string,
+  statusLine: string,
+  threadId = "thr_crew",
+): Promise<string> {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "fm-status-"));
+  tempRoots.push(root);
+  const stateDir = path.join(root, "state");
+  await fs.mkdir(stateDir, { recursive: true });
+  await fs.writeFile(path.join(stateDir, `${taskId}.status`), `${statusLine}\n`, "utf8");
+  await fs.writeFile(
+    path.join(stateDir, `${taskId}.meta`),
+    `bb_thread_id=${threadId}\n`,
+    "utf8",
+  );
+  return root;
+}
+
+function bridgeHarness(options: {
+  holds?: { threadId: string; title: string; state: "open" | "resolved" }[];
+  deliveryMode?: FleetNode["deliveryMode"];
+}) {
+  const ledger: { verb: string; threadId: string }[] = [];
+  const wakes: { reason: string; threadId: string; dedupeKey: string | null }[] = [];
+  const decisions: { key: string; threadId: string }[] = [];
+  const openHoldCalls: { title: string; threadId: string }[] = [];
+  let published = 0;
+  const holds = [...(options.holds ?? [])];
+
+  const store = {
+    appendLedger(row: { verb: string; threadId: string }) {
+      ledger.push({ verb: row.verb, threadId: row.threadId });
+    },
+    recordDecision(input: { key: string; threadId: string }) {
+      decisions.push({ key: input.key, threadId: input.threadId });
+    },
+    enqueueWake(input: {
+      reason: string;
+      threadId: string;
+      dedupeKey?: string | null;
+    }) {
+      wakes.push({
+        reason: input.reason,
+        threadId: input.threadId,
+        dedupeKey: input.dedupeKey ?? null,
+      });
+    },
+    getHome(homeId: string) {
+      return homeId === HOME.homeId ? HOME : undefined;
+    },
+    getNodeByThread(threadId: string) {
+      if (threadId !== CREW.threadId) return undefined;
+      return {
+        ...CREW,
+        deliveryMode: options.deliveryMode ?? CREW.deliveryMode,
+      };
+    },
+    listHolds(_homeId: string, state: "open" | "resolved") {
+      return holds.filter((hold) => hold.state === state);
+    },
+    listNodes(homeId: string) {
+      return homeId === HOME.homeId ? [CREW] : [];
+    },
+  };
+
+  const fleet = {
+    async syncCrewsFromStateMeta() {},
+    fsmForThread() {
+      return "working" as const;
+    },
+    openHold(input: { threadId: string; title: string }) {
+      openHoldCalls.push({ title: input.title, threadId: input.threadId });
+      holds.push({
+        threadId: input.threadId,
+        title: input.title,
+        state: "open",
+      });
+    },
+    publish() {
+      published += 1;
+    },
+  };
+
+  let cursors: Record<string, number> = {};
+  const bridge = new StatusBridge(
+    store as never,
+    fleet as never,
+    async () => cursors,
+    async (next) => {
+      cursors = next;
+    },
+  );
+
+  return {
+    bridge,
+    ledger,
+    wakes,
+    decisions,
+    openHoldCalls,
+    get published() {
+      return published;
+    },
+  };
+}
+
+describe("StatusBridge scan (M1 bridge gaps)", () => {
+  it("appends crew.note for note: status lines", async () => {
+    const checkout = await checkoutWithStatus("t1", "note: ship blocked on API");
+    const { bridge, ledger } = bridgeHarness({});
+    const ingested = await bridge.scanMateHome(HOME.homeId, [checkout]);
+    assert.equal(ingested, 1);
+    assert.equal(ledger.some((row) => row.verb === "crew.note"), true);
+  });
+
+  it("records decision on resolved: lines", async () => {
+    const checkout = await checkoutWithStatus("t1", "resolved: auth-model use JWT");
+    const { bridge, decisions } = bridgeHarness({});
+    await bridge.scanMateHome(HOME.homeId, [checkout]);
+    assert.deepEqual(decisions, [{ key: "auth-model", threadId: "thr_crew" }]);
+  });
+
+  it("opens hold on needs-decision when none exists", async () => {
+    const checkout = await checkoutWithStatus("t1", "needs-decision: pick merge strategy");
+    const { bridge, openHoldCalls } = bridgeHarness({});
+    await bridge.scanMateHome(HOME.homeId, [checkout]);
+    assert.equal(openHoldCalls.length, 1);
+    assert.equal(openHoldCalls[0]?.title, "pick merge strategy");
+  });
+
+  it("enqueues mate wake on terminal done:", async () => {
+    const checkout = await checkoutWithStatus("t1", "done: finished task");
+    const { bridge, wakes } = bridgeHarness({});
+    await bridge.scanMateHome(HOME.homeId, [checkout]);
+    assert.ok(
+      wakes.some(
+        (wake) =>
+          wake.threadId === HOME.mateThreadId &&
+          wake.dedupeKey === "terminal:thr_crew:done:",
+      ),
+    );
+  });
+
+  it("enqueues pr.ready wake only when mode-aware checks pass", async () => {
+    const url = "https://github.com/org/repo/pull/9";
+    const checkout = await checkoutWithStatus("t1", `done: ${url} checks green`);
+    const { bridge, wakes } = bridgeHarness({ deliveryMode: "no-mistakes" });
+    await bridge.scanMateHome(HOME.homeId, [checkout]);
+    assert.ok(wakes.some((wake) => wake.reason.startsWith("pr.ready:")));
+  });
+});

@@ -749,7 +749,29 @@ export class FleetStore {
     };
   }
 
+  private resurfaceExpiredSnoozes(homeId?: string): void {
+    const now = Date.now();
+    if (homeId) {
+      this.db
+        .prepare(
+          `UPDATE inbox SET state = 'open', snoozed_until_ms = NULL
+           WHERE home_id = ? AND state = 'snoozed' AND snoozed_until_ms <= ?`,
+        )
+        .run(homeId, now);
+    } else {
+      this.db
+        .prepare(
+          `UPDATE inbox SET state = 'open', snoozed_until_ms = NULL
+           WHERE state = 'snoozed' AND snoozed_until_ms <= ?`,
+        )
+        .run(now);
+    }
+  }
+
   listInbox(homeId: string, state?: InboxState, limit?: number): InboxItem[] {
+    if (state === "open" || state === undefined) {
+      this.resurfaceExpiredSnoozes(homeId);
+    }
     const capped =
       limit !== undefined
         ? Math.min(500, Math.max(1, Math.trunc(limit)))
@@ -793,6 +815,7 @@ export class FleetStore {
   }
 
   countOpenInbox(homeId?: string): number {
+    this.resurfaceExpiredSnoozes(homeId);
     const row = (homeId
       ? this.db
           .prepare(

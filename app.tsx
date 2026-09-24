@@ -159,11 +159,13 @@ function InboxList({
   onOpen,
   onResolve,
   onSnooze,
+  onReply,
 }: {
   items: InboxItem[];
   onOpen: (threadId: string) => void;
   onResolve: (id: string) => void;
   onSnooze: (id: string, untilMs: number) => void;
+  onReply: (threadId: string, text: string) => void;
 }) {
   if (items.length === 0) {
     return (
@@ -186,6 +188,13 @@ function InboxList({
           <div className="flex shrink-0 gap-1">
             <Button size="sm" variant="outline" onClick={() => onOpen(item.threadId)}>
               Open
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onReply(item.threadId, item.body)}
+            >
+              Reply
             </Button>
             <Button size="sm" variant="ghost" onClick={() => onResolve(item.id)}>
               Resolve
@@ -530,6 +539,11 @@ function FleetPage({ subPath }: { subPath?: string }) {
             onSnooze={(id, untilMs) => {
               rpc
                 .call("snoozeInbox", { homeId: selectedHomeId, id, untilMs })
+                .then(() => refetchHome(selectedHomeId));
+            }}
+            onReply={(threadId, text) => {
+              rpc
+                .call("steer", { homeId: selectedHomeId, threadId, text })
                 .then(() => refetchHome(selectedHomeId));
             }}
           />

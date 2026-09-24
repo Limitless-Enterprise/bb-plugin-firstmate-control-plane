@@ -1079,6 +1079,9 @@ export class FleetService {
     const lines = [
       digest.summary,
       holds.length
+        ? `Open decisions (${holds.length}): ${holds.map((h) => h.title).join("; ")}`
+        : "Open decisions: none",
+      holds.length
         ? `Open holds (${holds.length}): ${holds.map((h) => h.title).join("; ")}`
         : "Open holds: none",
       wakes.length
@@ -1525,17 +1528,6 @@ export class FleetService {
         yolo: input.yolo ?? false,
       },
     });
-    const node = this.attachCrew({
-      homeId: input.homeId,
-      threadId: thread.id,
-      label: input.label,
-      role: input.role,
-      parentId: input.parentId ?? home.primaryMateId,
-      deliveryMode: input.deliveryMode,
-      yolo: input.yolo,
-      dispatchProfileId: profile?.id ?? null,
-      envId: thread.environmentId ?? null,
-    });
     await this.bb.sdk.threads.send({
       threadId: thread.id,
       mode: "auto",
@@ -1547,7 +1539,17 @@ export class FleetService {
         },
       ],
     });
-    return node;
+    return this.attachCrew({
+      homeId: input.homeId,
+      threadId: thread.id,
+      label: input.label,
+      role: input.role,
+      parentId: input.parentId ?? home.primaryMateId,
+      deliveryMode: input.deliveryMode,
+      yolo: input.yolo,
+      dispatchProfileId: profile?.id ?? null,
+      envId: thread.environmentId ?? null,
+    });
   }
 
   async spawnCrewWithPaths(input: Parameters<FleetService["spawnCrew"]>[0]): Promise<
