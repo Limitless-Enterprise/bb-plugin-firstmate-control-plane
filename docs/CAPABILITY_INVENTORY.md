@@ -21,7 +21,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | B-W5 | Explicit-only backend (no auto-detect) | ✓ | ✅ |
 | B-W6 | Meta schema (bb_thread_id, bb_env_id, window, worktree) | ✓ | ✅ |
 | B-W7 | validate_task_endpoint BB arm | ✓ | ✅ |
-| B-W8 | docs/bb-backend.md + AGENTS.bb.md | ✓ | ✅ |
+| B-W8 | `docs/bb-integration/` (AGENTS.bb.md) + `packages/bb-backend/README.md` | ✓ | ✅ |
 | B-W9 | Apply to canonical + mate worktree | ✓ | ✅ |
 | B-W10 | Version pin overlay ↔ plugin | ✓ | ✅ |
 

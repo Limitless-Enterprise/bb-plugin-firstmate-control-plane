@@ -57,8 +57,9 @@ bb fleet bearings --mate <homeId>
 
 `tree` and `board` probe liveness before returning JSON.
 
-The status bridge watches `state/<task-id>.status` on this mate checkout.
-Ledger updates: `working:`, `done:` (incl. PR URLs), `failed:`, `blocked:`,
+Fleet’s status bridge scans `state/<task-id>.status` on every checkout path
+resolved for this home (registry checkout plus BB environment worktrees when
+present). Ledger updates: `working:`, `done:` (incl. PR URLs), `failed:`, `blocked:`,
 `paused:`, `needs-decision:` (opens holds), `resolved:`, and `note:` (appends
 `crew.note` ledger entries).
 
