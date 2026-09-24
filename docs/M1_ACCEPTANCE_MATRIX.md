@@ -23,6 +23,10 @@ The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it 
 
 Every **B-***, **P-***, and **U-*** row in `CAPABILITY_INVENTORY.md` with M1 ✓ must be **✅** in the inventory table. Run `./scripts/m1-inventory-gate.sh` before merge to `main`.
 
+**Integrity:** Do not mark M1 rows ✅ without executable evidence (unit test,
+`scripts/m1-ac-full.sh` check, or live mate verification). Doc-only promotion
+fails review.
+
 ## Gate command
 
 ```bash

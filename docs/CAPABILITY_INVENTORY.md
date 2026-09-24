@@ -255,9 +255,9 @@ P-M5–P-M8, B-S7, P-U17 — see Phase 13.
 
 | ID | Deliverable | Status |
 |---|---|---|
-| U1 | RFC: config/backends.d/ | 🔲 |
-| U2 | Backend adapter interface doc | 🔲 |
-| U3 | Extension manifest capability | 🔲 |
+| U1 | RFC: config/backends.d/ | ✅ |
+| U2 | Backend adapter interface doc | ✅ |
+| U3 | Extension manifest capability | ✅ |
 | U4 | No BB code in Firstmate core | ✅ policy |
 
 ---
