@@ -37,6 +37,24 @@
 }
 ```
 
+## Fleet tree node (UI / RPC projection)
+
+`bb fleet tree --json` and plugin RPCs return registry nodes plus live projection
+fields. Crew nodes may include display chips derived from ledger and dispatch
+profiles:
+
+```ts
+{
+  // …registry node fields…
+  fsmState: FsmState;
+  liveness: LivenessVerdict | null;
+  depth: number;
+  children: TreeNode[];
+  prUrl?: string | null;       // latest done: PR link from status ledger
+  profileLabel?: string | null; // dispatch profile label when set
+}
+```
+
 ## Dispatch profile
 
 ```ts
@@ -161,6 +179,11 @@ Resolving the last open hold on a thread appends `mark.idle` and clears blocked 
 - Dispatch profiles via `bb fleet profiles --mate <homeId>`.
 - Captain attention via **Fleet Inbox** only — not Command Center inbox.
 
+**Fleet panel RPCs** (see `contract.ts`): `fleetSnapshot` returns
+`{ digest, bearings, generatedAtMs }` for a home; `fleetNavCounts` returns
+`{ inbox, wakes, dead }` for sidebar badges. `inboxBadge` aggregates across
+homes when no home is selected.
+
 ## Isolation
 
 Every RPC enforces `homeId`. Cross-home reads/writes fail closed.
@@ -192,7 +215,8 @@ absent from tasks-axi), the wrapper removes the marker and exits 0. `fm-spawn --
 `--secondmate` still use native Firstmate backends; crew relaunch on BB threads is
 via `bb fleet relaunch` or Fleet UI controls. Status bridge
 watches `<mate-checkout>/state/<id>.status` for `working:`, `done:`, `failed:`,
-`blocked:`, `paused:`, `needs-decision:`, `resolved:`, and `note:`.
+`blocked:`, `paused:`, `needs-decision:`, `resolved:`, and `note:` (`note:` appends
+`crew.note` ledger entries; other prefixes map per `lib/status-verbs.ts`).
 PR poller watches GitHub checks.
 
 Pure CLI use: set `enabled: false` or use a checkout without the overlay.

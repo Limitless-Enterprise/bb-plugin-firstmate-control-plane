@@ -30,4 +30,6 @@ Overlay version is pinned in `config/bb-integration.json` and checked by
 
 ## Acceptance (inventory U2)
 
-This document satisfies U2 for the M1 program parallel track.
+This document satisfies U2 for the M1 program parallel track. Executable
+fail-closed checks for BB adapter arms run via `scripts/bb-backend-m1-contract.sh`
+(as part of `pnpm test`).

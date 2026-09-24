@@ -47,7 +47,7 @@ M1 is complete when every **M1 ✓** row in [docs/CAPABILITY_INVENTORY.md](./doc
 export FM_HOME=/path/to/firstmate-tech
 export MATE=tech
 ./scripts/m1-ac-full.sh          # fast smoke (24 checks; not sufficient alone)
-./scripts/m1-inventory-gate.sh # unit tests, typecheck, inventory scan
+./scripts/m1-inventory-gate.sh # pnpm test (incl. bb-backend contract), typecheck, inventory scan
 ```
 
 See [docs/M1_ACCEPTANCE_MATRIX.md](./docs/M1_ACCEPTANCE_MATRIX.md) and [docs/IMPLEMENTATION_PLAN.md §8](./docs/IMPLEMENTATION_PLAN.md#8-m1-acceptance-criteria-inventory-authoritative).
