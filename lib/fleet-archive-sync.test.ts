@@ -258,6 +258,26 @@ describe("Fleet archive sync (P-SYNC-1)", () => {
     assert.equal(fleet.fleetNavCounts("tech").wakes, 0);
   });
 
+  it("clears mate-targeted terminal and idle wakes on BB archive close-out", () => {
+    const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
+    const { fleet, store } = mockFleetService(nodes);
+    store.enqueueWake({
+      homeId: "tech",
+      threadId: TECH_HOME.mateThreadId,
+      reason: "terminal:done:task-1",
+      dedupeKey: "terminal:thr_crew:done:",
+    });
+    store.enqueueWake({
+      homeId: "tech",
+      threadId: TECH_HOME.mateThreadId,
+      reason: "thread.idle:thr_crew",
+      dedupeKey: "thread.idle:thr_crew",
+    });
+    assert.equal(fleet.fleetNavCounts("tech").wakes, 2);
+    assert.equal(fleet.closeOutRegistryForArchivedThread("thr_crew"), true);
+    assert.equal(fleet.fleetNavCounts("tech").wakes, 0);
+  });
+
   it("resolves open holds before registry close-out on BB archive", () => {
     const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
     const openHold: Hold = {
@@ -318,6 +338,35 @@ describe("Fleet archive sync (P-SYNC-1)", () => {
     assert.ok(archiveIdx >= 0);
     assert.ok(deleteIdx >= 0);
     assert.ok(archiveIdx < deleteIdx);
+  });
+
+  it("detachCrew clears inbox and wakes before removing registry node", async () => {
+    const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
+    const { fleet, store } = mockFleetService(nodes);
+    store.createInboxItem({
+      homeId: "tech",
+      threadId: "thr_crew",
+      kind: "wake",
+      title: "Turn failed",
+      body: "failed",
+    });
+    store.enqueueWake({
+      homeId: "tech",
+      threadId: "thr_crew",
+      reason: "turn.failed",
+      dedupeKey: "turn.failed:thr_crew",
+    });
+    store.enqueueWake({
+      homeId: "tech",
+      threadId: TECH_HOME.mateThreadId,
+      reason: "thread.idle:thr_crew",
+      dedupeKey: "thread.idle:thr_crew",
+    });
+    assert.equal(fleet.fleetNavCounts("tech").inbox, 1);
+    assert.equal(fleet.fleetNavCounts("tech").wakes, 2);
+    await fleet.detachCrew("tech", "thr_crew");
+    assert.equal(fleet.fleetNavCounts("tech").inbox, 0);
+    assert.equal(fleet.fleetNavCounts("tech").wakes, 0);
   });
 
   it("detachCrew leaves registry node when BB archive fails", async () => {

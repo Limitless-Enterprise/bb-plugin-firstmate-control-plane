@@ -216,7 +216,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-U2 | Status board tab | ✓ | ✅ |
 | P-U3 | StatusDot ← FSM | ✓ | ✅ |
 | P-U4 | Liveness pip | ✓ | ✅ |
-| P-U5 | Mode + profile + PR chips | ✓ | ✅ |
+| P-U5 | Mode + profile + PR chips | ✓ | ⚠ |
 | P-U6 | Ship/scout badges | ✓ | ✅ |
 | P-U7 | Deep link /fleet/<threadId> | ✓ | ✅ |
 | P-U8 | Mobile drawer | ✓ | ⚠ |
@@ -237,7 +237,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 |---|---|---|---|
 | P-C1 | bb fleet digest | ✓ | ✅ |
 | P-C2 | bb fleet bearings | ✓ | ✅ |
-| P-C3 | Full digest builder | ✓ | ✅ |
+| P-C3 | Full digest builder | ✓ | ⚠ |
 | P-C4 | CoS notify mate down | ✓ | ✅ |
 | P-C5 | Fleet snapshot API | ✓ | ⚠ |
 

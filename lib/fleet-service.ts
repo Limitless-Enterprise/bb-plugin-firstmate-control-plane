@@ -53,6 +53,26 @@ function legacyThreadId(homeId: string, taskId: string): string {
   return `legacy:${homeId}:${taskId}`;
 }
 
+function wakeTiedToCrewThread(
+  wake: { threadId: string | null; dedupeKey: string | null },
+  crewThreadId: string,
+  resolvedHoldIds: readonly string[],
+): boolean {
+  if (wake.threadId === crewThreadId) return true;
+  const key = wake.dedupeKey;
+  if (!key) return false;
+  if (resolvedHoldIds.some((holdId) => key === `hold:${holdId}`)) {
+    return true;
+  }
+  if (key === `thread.idle:${crewThreadId}`) return true;
+  if (key.startsWith(`terminal:${crewThreadId}:`)) return true;
+  if (key.startsWith(`blocked:${crewThreadId}:`)) return true;
+  if (key === `pr.ready:${crewThreadId}`) return true;
+  if (key === `pr.green:${crewThreadId}`) return true;
+  if (key === `pr.failed:${crewThreadId}`) return true;
+  return false;
+}
+
 export function isLegacyFleetThreadId(threadId: string): boolean {
   return threadId.startsWith("legacy:");
 }
@@ -1346,6 +1366,23 @@ export class FleetService {
     return updated;
   }
 
+  private clearCrewThreadInboxAndWakes(
+    homeId: string,
+    crewThreadId: string,
+    resolvedHoldIds: readonly string[],
+  ): void {
+    for (const item of this.store.listInbox(homeId, "open")) {
+      if (item.threadId === crewThreadId) {
+        this.store.resolveInbox(item.id);
+      }
+    }
+    for (const wake of this.store.listWakes(homeId, false)) {
+      if (wakeTiedToCrewThread(wake, crewThreadId, resolvedHoldIds)) {
+        this.store.ackWake(wake.id);
+      }
+    }
+  }
+
   /** BB→Fleet close-out (P-SYNC-1): resolve open holds, then remove registry node. */
   closeOutRegistryForArchivedThread(threadId: string): boolean {
     const node = this.store.getNodeByThread(threadId);
@@ -1357,19 +1394,7 @@ export class FleetService {
       resolvedHoldIds.push(hold.id);
       this.resolveHold(node.homeId, hold.id);
     }
-    for (const item of this.store.listInbox(node.homeId, "open")) {
-      if (item.threadId === threadId) {
-        this.store.resolveInbox(item.id);
-      }
-    }
-    for (const wake of this.store.listWakes(node.homeId, false)) {
-      if (
-        wake.threadId === threadId ||
-        resolvedHoldIds.some((holdId) => wake.dedupeKey === `hold:${holdId}`)
-      ) {
-        this.store.ackWake(wake.id);
-      }
-    }
+    this.clearCrewThreadInboxAndWakes(node.homeId, threadId, resolvedHoldIds);
     this.store.appendLedger({
       homeId: node.homeId,
       threadId,
@@ -1411,6 +1436,7 @@ export class FleetService {
       // thread may already be stopped
     }
     await this.archiveBbThread(threadId);
+    this.clearCrewThreadInboxAndWakes(homeId, threadId, []);
     this.store.deleteNode(node.id);
     this.publish();
   }
