@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
-const FLEET_CHANGED = "fleet-changed";
+import { FLEET_REALTIME_TOPIC, fleetPanelFromSubPath, mobileTreeDrawerHidden, needsDecisionRailLine } from "./lib/fleet-ui";
 
 type Tab = "fleet" | "inbox" | "board" | "homes";
 
@@ -403,18 +403,15 @@ function FleetPage({ subPath }: { subPath?: string }) {
     refetchHome(selectedHomeId);
   }, [selectedHomeId, refetchHome]);
 
-  useRealtime(FLEET_CHANGED, () => {
+  useRealtime(FLEET_REALTIME_TOPIC, () => {
     refetch();
     refetchHome(selectedHomeId);
   });
 
   useEffect(() => {
-    if (subPath?.startsWith("inbox")) setTab("inbox");
-    else if (subPath?.startsWith("board")) setTab("board");
-    else if (subPath?.startsWith("homes")) setTab("homes");
-    else setTab("fleet");
-    const threadMatch = subPath?.match(/^thread\/(.+)$/);
-    if (threadMatch) setSelectedThreadId(threadMatch[1]);
+    const { tab, threadId } = fleetPanelFromSubPath(subPath);
+    setTab(tab);
+    if (threadId) setSelectedThreadId(threadId);
   }, [subPath]);
 
   const openHolds = useMemo(
@@ -489,10 +486,9 @@ function FleetPage({ subPath }: { subPath?: string }) {
         </div>
       </header>
 
-      {openHolds.length > 0 ? (
+      {needsDecisionRailLine(openHolds) ? (
         <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm">
-          Needs decision: {openHolds[0]?.title}
-          {openHolds.length > 1 ? ` (+${openHolds.length - 1})` : ""}
+          {needsDecisionRailLine(openHolds)}
         </div>
       ) : null}
 
@@ -567,7 +563,7 @@ function FleetPage({ subPath }: { subPath?: string }) {
             className={cn(
               "min-h-0 overflow-y-auto border-r border-border p-2",
               "max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-20 max-md:w-[min(280px,85vw)] max-md:bg-background max-md:shadow-lg",
-              !treeOpen && "max-md:hidden",
+              !treeOpen && mobileTreeDrawerHidden(treeOpen),
             )}
           >
             {tree.length === 0 ? (

@@ -29,7 +29,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test lib/*.test.ts && bash scripts/bb-backend-m1-contract.sh",
+    "test": "node --import tsx --test lib/*.test.ts && bash scripts/bb-backend-m1-contract.sh && bash scripts/spawn-wrap-m1-contract.sh",
     "build": "bb plugin build ."
   },
   "devDependencies": {

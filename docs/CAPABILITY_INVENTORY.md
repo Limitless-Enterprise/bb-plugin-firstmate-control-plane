@@ -29,15 +29,15 @@ Nothing in this list is optional for the full program. M1 completes items throug
 
 | ID | Capability | M1 | Status |
 |---|---|---|---|
-| B-S1 | Full native spawn pipeline | ✓ | ⚠ |
+| B-S1 | Full native spawn pipeline | ✓ | ✅ |
 | B-S2 | bb fleet spawn → thread + worktree | ✓ | ✅ |
 | B-S3 | Launch brief in BB thread | ✓ | ✅ |
 | B-S4 | Delivery mode + yolo passthrough | ✓ | ✅ |
 | B-S5 | Dispatch profile passthrough | ✓ | ✅ |
-| B-S6 | --relaunch | ✓ | ⚠ |
+| B-S6 | --relaunch | ✓ | ✅ |
 | B-S7 | --secondmate | M3 | 🔲 |
 | B-S8 | Batch spawn | ✓ | 🔲 |
-| B-S9 | Project registration / fleet sync | ✓ | ⚠ |
+| B-S9 | Project registration / fleet sync | ✓ | ✅ |
 
 ### fm-backend ops
 
@@ -60,8 +60,8 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | ID | Capability | M1 | Status |
 |---|---|---|---|
 | B-C1 | fm-control interrupt | ✓ | ✅ |
-| B-C2 | fm-control exit | ✓ | ⚠ |
-| B-C3 | fm-control relaunch | ✓ | ⚠ |
+| B-C2 | fm-control exit | ✓ | ✅ |
+| B-C3 | fm-control relaunch | ✓ | ✅ |
 | B-C4 | fm-teardown full path | ✓ | ✅ |
 | B-C5 | Teardown refused (holds/dirty) | ✓ | ✅ |
 | B-C6 | Backlog done (native) | ✓ | ✅ |
@@ -152,7 +152,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 |---|---|---|---|
 | P-V1 | bb fleet probe / liveness | ✓ | ✅ |
 | P-V2 | Verdicts alive/dead/missing/ambiguous | ✓ | ✅ |
-| P-V3 | Full probe pipeline | ✓ | ⚠ |
+| P-V3 | Full probe pipeline | ✓ | ✅ |
 | P-V4 | Desync reconciliation | ✓ | 🔲 |
 | P-V5 | Never respawn ambiguous | ✓ | ✅ |
 | P-V6 | Auto-respawn dead/missing | ✓ | ✅ |
@@ -189,10 +189,10 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-H8 | Fleet Inbox tab | ✓ | ✅ |
 | P-H9 | Inbox filters | ✓ | 🔲 |
 | P-H10 | Snooze / resolve / reply | ✓ | ✅ |
-| P-H11 | Deep links /fleet/inbox | ✓ | ⚠ |
+| P-H11 | Deep links /fleet/inbox | ✓ | ✅ |
 | P-H12 | Nav badge inbox count | ✓ | ✅ |
 | P-H13 | CLI inbox | ✓ | ✅ |
-| P-H14 | Needs-decision rail strip | ✓ | ⚠ |
+| P-H14 | Needs-decision rail strip | ✓ | ✅ |
 
 ### PR / CI
 
@@ -219,12 +219,12 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-U5 | Mode + profile + PR chips | ✓ | ✅ |
 | P-U6 | Ship/scout badges | ✓ | ✅ |
 | P-U7 | Deep link /fleet/<threadId> | ✓ | ✅ |
-| P-U8 | Mobile drawer | ✓ | ⚠ |
-| P-U9 | Realtime refresh | ✓ | ⚠ |
-| P-U10 | Fleet settings | ✓ | ⚠ |
+| P-U8 | Mobile drawer | ✓ | ✅ |
+| P-U9 | Realtime refresh | ✓ | ✅ |
+| P-U10 | Fleet settings | ✓ | ✅ |
 | P-U11 | Spawn UI profile picker | ✓ | 🔲 |
-| P-U12 | Overflow interrupt/exit/relaunch | ✓ | ⚠ |
-| P-U13 | Composer steer in panel | ✓ | ⚠ |
+| P-U12 | Overflow interrupt/exit/relaunch | ✓ | ✅ |
+| P-U13 | Composer steer in panel | ✓ | ✅ |
 | P-U14 | Nav badges (inbox/wakes/dead) | ✓ | ✅ |
 | P-U15 | Home switcher | M2 | ⚠ |
 | P-U16 | Unified cross-home inbox | M2 | 🔲 |
