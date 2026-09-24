@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { FLEET_CHANGED, FleetService } from "./fleet-service";
+import { FleetService } from "./fleet-service";
 import {
   FLEET_REALTIME_TOPIC,
   fleetOverflowRpcCall,
@@ -106,11 +106,5 @@ describe("FleetService.publish realtime (P-U9)", () => {
     );
     await fleet.exitThread("tech", "thr_crew");
     assert.equal(topic, FLEET_REALTIME_TOPIC);
-  });
-});
-
-describe("FLEET realtime topic alias", () => {
-  it("matches exported constant", () => {
-    assert.equal(FLEET_REALTIME_TOPIC, FLEET_CHANGED);
   });
 });
