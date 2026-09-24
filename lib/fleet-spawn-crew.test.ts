@@ -33,6 +33,7 @@ function spawnFleet(options: {
   archiveError?: Error;
   onSend?: () => void;
   onAttach?: () => void;
+  onSpawnProject?: (projectId: string) => void;
 }) {
   const bbEvents: string[] = [];
   const nodes = new Map<string, FleetNode>([["mate-1", { ...PRIMARY }]]);
@@ -78,7 +79,8 @@ function spawnFleet(options: {
             id: "thr_mate",
             projectId: "proj-1",
           }),
-          spawn: async () => {
+          spawn: async (input: { projectId: string }) => {
+            options.onSpawnProject?.(input.projectId);
             bbEvents.push("spawn:thr_spawned");
             return { id: "thr_spawned", environmentId: "env-1" };
           },
@@ -107,7 +109,12 @@ function spawnFleet(options: {
 
 describe("spawnCrew launch brief (B-S3)", () => {
   it("sends launch brief before attachCrew registers node", async () => {
-    const { fleet, bbEvents, nodes } = spawnFleet({});
+    let spawnProjectId: string | undefined;
+    const { fleet, bbEvents, nodes } = spawnFleet({
+      onSpawnProject: (id) => {
+        spawnProjectId = id;
+      },
+    });
     const node = await fleet.spawnCrew({
       homeId: "tech",
       label: "alpha",
@@ -121,6 +128,24 @@ describe("spawnCrew launch brief (B-S3)", () => {
     assert.ok(sendIdx >= 0);
     assert.ok(insertIdx >= 0);
     assert.ok(sendIdx < insertIdx);
+    assert.equal(spawnProjectId, "proj-1");
+  });
+
+  it("binds crew spawn to mate thread project (P-R7)", async () => {
+    let spawnProjectId: string | undefined;
+    const { fleet } = spawnFleet({
+      onSpawnProject: (id) => {
+        spawnProjectId = id;
+      },
+    });
+    await fleet.spawnCrew({
+      homeId: "tech",
+      label: "alpha",
+      role: "ship",
+      prompt: "do work",
+      projectId: "proj-override-should-not-win",
+    });
+    assert.equal(spawnProjectId, "proj-1");
   });
 
   it("uses home default dispatch profile when profileId omitted (P-D4)", async () => {

@@ -17,7 +17,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | B-W1 | Register `bb` in fm-backend | ✓ | ✅ |
 | B-W2 | `config/backend=bb` when fleet home active | ✓ | ✅ |
 | B-W3 | Required tools: bb, jq | ✓ | ✅ |
-| B-W4 | validate_spawn → fleet home + bb-integration.json | ✓ | ⚠ |
+| B-W4 | validate_spawn → fleet home + bb-integration.json | ✓ | ✅ |
 | B-W5 | Explicit-only backend (no auto-detect) | ✓ | ✅ |
 | B-W6 | Meta schema (bb_thread_id, bb_env_id, window, worktree) | ✓ | ✅ |
 | B-W7 | validate_task_endpoint BB arm | ✓ | ✅ |
@@ -43,13 +43,13 @@ Nothing in this list is optional for the full program. M1 completes items throug
 
 | ID | Op | M1 | Status |
 |---|---|---|---|
-| B-O1 | capture | ✓ | ⚠ |
+| B-O1 | capture | ✓ | ✅ |
 | B-O2 | target_exists | ✓ | ✅ |
 | B-O3 | agent_state / agent_alive | ✓ | ✅ |
 | B-O4 | send_text_submit | ✓ | ✅ |
-| B-O5 | send_key | ✓ | ⚠ |
+| B-O5 | send_key | ✓ | ✅ |
 | B-O6 | kill | ✓ | ✅ |
-| B-O7 | busy_state | ✓ | ⚠ |
+| B-O7 | busy_state | ✓ | ✅ |
 | B-O8 | composer_state (proxy) | ✓ | ✅ |
 | B-O9 | visible_capture (fail-closed) | ✓ | ✅ |
 | B-O10 | has_push / wait_transition | ✓ | 🔲 |
@@ -71,7 +71,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | ID | Capability | M1 | Status |
 |---|---|---|---|
 | B-ST1 | Ingest state/<id>.status | ✓ | ✅ |
-| B-ST2 | All status verbs | ✓ | ⚠ |
+| B-ST2 | All status verbs | ✓ | ✅ |
 | B-ST3 | OPEN DECISIONS fold | ✓ | ✅ |
 | B-ST4 | Status vs backlog divergence | ✓ | 🔲 |
 | B-ST5 | PR ready lines → poller | ✓ | ✅ |
@@ -91,7 +91,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-R4 | homeId isolation | ✓ | ✅ |
 | P-R5 | integration apply/check | ✓ | ✅ |
 | P-R6 | Bootstrap auto-apply | ✓ | ✅ |
-| P-R7 | Project/repo binding | ✓ | ⚠ |
+| P-R7 | Project/repo binding | ✓ | ✅ |
 | P-R8 | Orphan sweep | ✓ | ✅ |
 | P-SYNC-1 | BB archive ↔ Fleet close-out | ✓ | ✅ |
 
@@ -199,8 +199,8 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | ID | Capability | M1 | Status |
 |---|---|---|---|
 | P-P1 | Parse done: PR | ✓ | ✅ |
-| P-P2 | PR/CI poller | ✓ | ⚠ |
-| P-P3 | Checks pending/green/failed wakes | ✓ | ⚠ |
+| P-P2 | PR/CI poller | ✓ | ✅ |
+| P-P3 | Checks pending/green/failed wakes | ✓ | ✅ |
 | P-P4 | Mode-aware ready | ✓ | ✅ |
 | P-P5 | Merge outcome retire poll | ✓ | 🔲 |
 | P-P6 | Held for merge | ✓ | 🔲 |

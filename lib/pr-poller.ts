@@ -39,12 +39,16 @@ async function ghPrCheckState(
   }
 }
 
+export type PrCheckState = GhCheckState | "unavailable";
+export type PrCheckStateResolver = (prUrl: string) => Promise<PrCheckState>;
+
 export class PrPoller {
   constructor(
     private readonly store: FleetStore,
     private readonly fleet: FleetService,
     private readonly readSeen: () => Promise<Record<string, string>>,
     private readonly writeSeen: (next: Record<string, string>) => Promise<void>,
+    private readonly resolveCheckState: PrCheckStateResolver = ghPrCheckState,
   ) {}
 
   async pollHome(homeId: string): Promise<number> {
@@ -63,7 +67,7 @@ export class PrPoller {
       const url = String(prEntry.detail?.url);
       const key = `${node.threadId}:${url}`;
       const prior = seen[key];
-      const state = await ghPrCheckState(url);
+      const state = await this.resolveCheckState(url);
       if (state === "unavailable" || state === prior) continue;
 
       seen[key] = state;

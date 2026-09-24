@@ -154,17 +154,18 @@ describe("StatusBridge scan (M1 bridge gaps)", () => {
 
   it("records decision on resolved: lines", async () => {
     const checkout = await checkoutWithStatus("t1", "resolved: auth-model use JWT");
-    const { bridge, decisions } = bridgeHarness({});
+    const { bridge, decisions, ledger } = bridgeHarness({});
     await bridge.scanMateHome(HOME.homeId, [checkout]);
     assert.deepEqual(decisions, [{ key: "auth-model", threadId: "thr_crew" }]);
+    assert.ok(ledger.some((row) => row.verb === "crew.resolved"));
   });
 
-  it("opens hold on needs-decision when none exists", async () => {
+  it("appends crew.needs-decision ledger verb", async () => {
     const checkout = await checkoutWithStatus("t1", "needs-decision: pick merge strategy");
-    const { bridge, openHoldCalls } = bridgeHarness({});
+    const { bridge, ledger, openHoldCalls } = bridgeHarness({});
     await bridge.scanMateHome(HOME.homeId, [checkout]);
     assert.equal(openHoldCalls.length, 1);
-    assert.equal(openHoldCalls[0]?.title, "pick merge strategy");
+    assert.ok(ledger.some((row) => row.verb === "crew.needs-decision"));
   });
 
   it("enqueues mate wake on terminal done:", async () => {

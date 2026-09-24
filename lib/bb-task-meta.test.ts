@@ -17,6 +17,20 @@ describe("validateBbTaskMeta (B-W7, P-V9)", () => {
     assert.equal(result.ok, true);
   });
 
+  it("rejects incomplete bb meta without project (P-R7)", () => {
+    const result = validateBbTaskMeta(
+      {
+        backend: "bb",
+        window: "@thread:thr_crew",
+        worktree: "/wt",
+        endpoint_task_id: "ship-1",
+      },
+      "ship-1",
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.reason, /incomplete/);
+  });
+
   it("rejects endpoint_task_id mismatch", () => {
     const result = validateBbTaskMeta(
       {

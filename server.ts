@@ -307,7 +307,16 @@ export default async function plugin(bb: BbPluginApi) {
     inboxBadge: () => {
       const homeId = store.getSelectedHomeId();
       if (!homeId) {
-        return { count: store.countOpenInbox(), wakes: 0, dead: 0 };
+        let inbox = 0;
+        let wakes = 0;
+        let dead = 0;
+        for (const home of store.listHomes()) {
+          const nav = fleet.fleetNavCounts(home.homeId);
+          inbox += nav.inbox;
+          wakes += nav.wakes;
+          dead += nav.dead;
+        }
+        return { count: inbox, wakes, dead };
       }
       const nav = fleet.fleetNavCounts(homeId);
       return { count: nav.inbox, wakes: nav.wakes, dead: nav.dead };
