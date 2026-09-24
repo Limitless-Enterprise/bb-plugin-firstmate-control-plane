@@ -14,7 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
-import { FLEET_REALTIME_TOPIC, fleetPanelFromSubPath, mobileTreeDrawerHidden, needsDecisionRailLine } from "./lib/fleet-ui";
+import {
+  FLEET_REALTIME_TOPIC,
+  fleetOverflowRpcCall,
+  fleetPanelFromSubPath,
+  fleetSteerPayload,
+  mobileTreeDrawerHidden,
+  needsDecisionRailLine,
+} from "./lib/fleet-ui";
 
 type Tab = "fleet" | "inbox" | "board" | "homes";
 
@@ -286,10 +293,10 @@ function ThreadControls({
         className="flex gap-2"
         onSubmit={(event) => {
           event.preventDefault();
-          const text = steerText.trim();
-          if (!text) return;
+          const payload = fleetSteerPayload(homeId, node.threadId, steerText);
+          if (!payload) return;
           void run(async () => {
-            await rpc.call("steer", { homeId, threadId: node.threadId, text });
+            await rpc.call("steer", payload);
             setSteerText("");
           });
         }}
@@ -311,9 +318,14 @@ function ThreadControls({
             size="sm"
             variant="outline"
             disabled={busy}
-            onClick={() =>
-              void run(() => rpc.call("interrupt", { homeId, threadId: node.threadId }))
-            }
+            onClick={() => {
+              const { method, params } = fleetOverflowRpcCall(
+                "interrupt",
+                homeId,
+                node.threadId,
+              );
+              void run(() => rpc.call(method, params));
+            }}
           >
             Interrupt
           </Button>
@@ -321,9 +333,14 @@ function ThreadControls({
             size="sm"
             variant="outline"
             disabled={busy}
-            onClick={() =>
-              void run(() => rpc.call("exitThread", { homeId, threadId: node.threadId }))
-            }
+            onClick={() => {
+              const { method, params } = fleetOverflowRpcCall(
+                "exitThread",
+                homeId,
+                node.threadId,
+              );
+              void run(() => rpc.call(method, params));
+            }}
           >
             Exit
           </Button>
@@ -331,9 +348,14 @@ function ThreadControls({
             size="sm"
             variant="outline"
             disabled={busy}
-            onClick={() =>
-              void run(() => rpc.call("relaunch", { homeId, threadId: node.threadId }))
-            }
+            onClick={() => {
+              const { method, params } = fleetOverflowRpcCall(
+                "relaunch",
+                homeId,
+                node.threadId,
+              );
+              void run(() => rpc.call(method, params));
+            }}
           >
             Relaunch
           </Button>
@@ -341,9 +363,14 @@ function ThreadControls({
             size="sm"
             variant="ghost"
             disabled={busy}
-            onClick={() =>
-              void run(() => rpc.call("detachCrew", { homeId, threadId: node.threadId }))
-            }
+            onClick={() => {
+              const { method, params } = fleetOverflowRpcCall(
+                "detachCrew",
+                homeId,
+                node.threadId,
+              );
+              void run(() => rpc.call(method, params));
+            }}
           >
             Detach
           </Button>

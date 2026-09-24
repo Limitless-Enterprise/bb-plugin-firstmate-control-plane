@@ -4,7 +4,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 
 **Legend:** ✅ done · 🔲 not done · ⚠ partial
 
-**Last aligned:** 2026-09-24 (`feat/m1-inventory-complete` — batch 4: bb-backend contract, P-R7 paths, B-ST2 bridge, PrPoller tests, inboxBadge aggregation; M1 gate still fails while ⚠/🔲 rows remain)
+**Last aligned:** 2026-09-24 (`feat/m1-inventory-complete` — batch 5: all M1 partials closed; 35 🔲 remain)
 
 ---
 

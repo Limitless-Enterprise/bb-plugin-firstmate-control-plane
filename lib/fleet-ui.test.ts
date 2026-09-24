@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { FLEET_CHANGED } from "./fleet-service";
+import { FLEET_CHANGED, FleetService } from "./fleet-service";
 import {
   FLEET_REALTIME_TOPIC,
   fleetOverflowRpcCall,
@@ -75,8 +75,42 @@ describe("mobileTreeDrawerHidden (P-U8)", () => {
   });
 });
 
-describe("FLEET realtime topic (P-U9)", () => {
-  it("matches server publish topic", () => {
+describe("FleetService.publish realtime (P-U9)", () => {
+  it("publishes fleet-changed when mutating fleet state", async () => {
+    let topic: string | null = null;
+    const fleet = new FleetService(
+      {
+        sdk: {
+          threads: { stop: async () => {} },
+        },
+        log: { warn: () => {} },
+        realtime: {
+          publish: (t: string) => {
+            topic = t;
+          },
+        },
+      } as never,
+      {
+        getHome: () => ({
+          homeId: "tech",
+          label: "tech",
+          checkoutPath: "/tmp",
+          primaryMateId: "m1",
+          mateThreadId: "thr_mate",
+          defaultProfileId: null,
+          createdAtMs: 1,
+        }),
+        appendLedger: () => {},
+        setLiveness: () => {},
+      } as never,
+    );
+    await fleet.exitThread("tech", "thr_crew");
+    assert.equal(topic, FLEET_REALTIME_TOPIC);
+  });
+});
+
+describe("FLEET realtime topic alias", () => {
+  it("matches exported constant", () => {
     assert.equal(FLEET_REALTIME_TOPIC, FLEET_CHANGED);
   });
 });
