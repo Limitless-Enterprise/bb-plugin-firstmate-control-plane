@@ -106,7 +106,7 @@ if [ "$USE_BB_TEARDOWN" = 1 ]; then
           echo "fm-bb: teardown refused — ${open_holds} open hold(s) on ${TASK_ID}" >&2
           exit 2
         fi
-        bb fleet detach --mate "$FM_BB_HOME_ID" --thread "$tid" >/dev/null 2>&1 || true
+        bb fleet detach --mate "$FM_BB_HOME_ID" --thread "$tid" >/dev/null 2>&1
       fi
     fi
   fi
