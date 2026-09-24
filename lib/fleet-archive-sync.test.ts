@@ -30,6 +30,7 @@ const CREW_NODE: FleetNode = {
   envId: null,
   deliveryMode: "no-mistakes",
   yolo: false,
+  dispatchProfileId: null,
   createdAtMs: 1,
 };
 
@@ -171,6 +172,7 @@ describe("Fleet archive sync (P-SYNC-1)", () => {
           envId: null,
           deliveryMode: "no-mistakes",
           yolo: false,
+          dispatchProfileId: null,
           createdAtMs: 1,
         },
       ],
