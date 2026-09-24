@@ -52,7 +52,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | B-O7 | busy_state | ✓ | ✅ |
 | B-O8 | composer_state (proxy) | ✓ | ✅ |
 | B-O9 | visible_capture (fail-closed) | ✓ | ✅ |
-| B-O10 | has_push / wait_transition | ✓ | 🔲 |
+| B-O10 | has_push / wait_transition | ✓ | ✅ |
 | B-O11 | commit/clear_transition | ✓ | 🔲 |
 
 ### Control & teardown

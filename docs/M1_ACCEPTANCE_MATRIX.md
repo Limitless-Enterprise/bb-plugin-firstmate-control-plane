@@ -9,7 +9,7 @@ The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it 
 | Kind | Meaning |
 |------|---------|
 | **live** | `scripts/m1-ac-full.sh` or `m1-ac-live-*` against `tech` mate |
-| **unit** | `pnpm test` (`lib/*.test.ts` + `scripts/bb-backend-m1-contract.sh` for overlay B-O8/B-O9/B-O10 fail-closed). Partial-row evidence (still ⚠ in inventory): P-R7 `mate-checkout-paths.test.ts`; B-ST2 `status-verbs.test.ts` + `status-bridge.test.ts`; P-P2/P-P3 `pr-poller.test.ts` (helpers only until poller behavior tests land) |
+| **unit** | `pnpm test` (`lib/*.test.ts` + `scripts/bb-backend-m1-contract.sh` for overlay B-O8/B-O9/B-O10 fail-closed, B-W4 validate_spawn, B-O1/B-O5/B-O7 with stub `bb`). Partial-row evidence (still ⚠ in inventory): B-ST2 bridge gaps in `status-bridge.test.ts`; P-P2/P-P3 `PrPoller.pollHome` in `pr-poller.test.ts`; P-R7 mate `projectId` on `spawnCrew` in `fleet-spawn-crew.test.ts` |
 | **lint** | `pnpm run typecheck` + repo linters |
 | **doc** | File present and matches behavior |
 

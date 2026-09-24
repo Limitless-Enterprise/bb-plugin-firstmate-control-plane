@@ -17,7 +17,7 @@ describe("validateBbTaskMeta (B-W7, P-V9)", () => {
     assert.equal(result.ok, true);
   });
 
-  it("rejects incomplete bb meta without project (P-R7)", () => {
+  it("rejects incomplete bb meta without project (B-W7)", () => {
     const result = validateBbTaskMeta(
       {
         backend: "bb",
