@@ -4,7 +4,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 
 **Legend:** ✅ done · 🔲 not done · ⚠ partial
 
-**Last aligned:** 2026-09-24 (`feat/m1-inventory-complete` — M1 partials closed)
+**Last aligned:** 2026-09-24 (`feat/m1-inventory-complete` — partial ⚠ rows in progress)
 
 ---
 
@@ -219,9 +219,9 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-U5 | Mode + profile + PR chips | ✓ | ✅ |
 | P-U6 | Ship/scout badges | ✓ | ✅ |
 | P-U7 | Deep link /fleet/<threadId> | ✓ | ✅ |
-| P-U8 | Mobile drawer | ✓ | ✅ |
-| P-U9 | Realtime refresh | ✓ | ✅ |
-| P-U10 | Fleet settings | ✓ | ✅ |
+| P-U8 | Mobile drawer | ✓ | ⚠ |
+| P-U9 | Realtime refresh | ✓ | ⚠ |
+| P-U10 | Fleet settings | ✓ | ⚠ |
 | P-U11 | Spawn UI profile picker | ✓ | 🔲 |
 | P-U12 | Overflow interrupt/exit/relaunch | ✓ | ✅ |
 | P-U13 | Composer steer in panel | ✓ | ✅ |

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  dedupePrefix,
   shouldEnqueuePrReadyWake,
   wakeIdsToAckThrough,
 } from "./fleet-bridge-helpers";
@@ -62,13 +61,5 @@ describe("wakeIdsToAckThrough (P-W3)", () => {
       "a",
     );
     assert.deepEqual(ids, ["a"]);
-  });
-});
-
-describe("dedupePrefix", () => {
-  it("returns segment before first colon", () => {
-    assert.equal(dedupePrefix("blocked:thr:line"), "blocked");
-    assert.equal(dedupePrefix("solo"), "solo");
-    assert.equal(dedupePrefix(null), null);
   });
 });

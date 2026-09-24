@@ -1081,9 +1081,6 @@ export class FleetService {
       holds.length
         ? `Open decisions (${holds.length}): ${holds.map((h) => h.title).join("; ")}`
         : "Open decisions: none",
-      holds.length
-        ? `Open holds (${holds.length}): ${holds.map((h) => h.title).join("; ")}`
-        : "Open holds: none",
       wakes.length
         ? `Unacked wakes (${wakes.length}): ${wakes.map((w) => w.reason).join("; ")}`
         : "Unacked wakes: none",
@@ -1528,17 +1525,27 @@ export class FleetService {
         yolo: input.yolo ?? false,
       },
     });
-    await this.bb.sdk.threads.send({
-      threadId: thread.id,
-      mode: "auto",
-      input: [
-        {
-          type: "text",
-          text: `Launch brief (${input.role} · ${input.label}):\n\n${input.prompt}`,
-          mentions: [],
-        },
-      ],
-    });
+    try {
+      await this.bb.sdk.threads.send({
+        threadId: thread.id,
+        mode: "auto",
+        input: [
+          {
+            type: "text",
+            text: `Launch brief (${input.role} · ${input.label}):\n\n${input.prompt}`,
+            mentions: [],
+          },
+        ],
+      });
+    } catch (error) {
+      try {
+        await this.bb.sdk.threads.stop({ threadId: thread.id });
+      } catch {
+        // thread may already be stopped
+      }
+      await this.archiveBbThread(thread.id);
+      throw error;
+    }
     return this.attachCrew({
       homeId: input.homeId,
       threadId: thread.id,

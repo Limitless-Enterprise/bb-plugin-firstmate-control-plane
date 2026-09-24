@@ -13,12 +13,6 @@ export function shouldEnqueuePrReadyWake(
   return isChecksGreen(doneDetail);
 }
 
-export function dedupePrefix(dedupeKey: string | null): string | null {
-  if (!dedupeKey) return null;
-  const idx = dedupeKey.indexOf(":");
-  return idx === -1 ? dedupeKey : dedupeKey.slice(0, idx);
-}
-
 /** Ack matching dedupe family (P-W3 ack-through). */
 export function wakeIdsToAckThrough(
   wakes: { id: string; dedupeKey: string | null; acked: boolean }[],

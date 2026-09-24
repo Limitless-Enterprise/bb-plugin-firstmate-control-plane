@@ -2,7 +2,6 @@ import { type BbPluginApi } from "@get-bb/plugin-sdk";
 import { rpcContract } from "./contract";
 import { FleetStore, migrations } from "./lib/db";
 import { FLEET_CHANGED, FleetService, isLegacyFleetThreadId } from "./lib/fleet-service";
-import { projectFsm } from "./lib/fsm";
 import { createStatusBridge } from "./lib/status-bridge";
 import { createPrPoller } from "./lib/pr-poller";
 import {
@@ -11,6 +10,7 @@ import {
   shouldEnqueueBusyAgeStall,
   shouldEnqueueStaleIdleSupervision,
 } from "./lib/supervisor-wakes";
+import { onThreadIdle } from "./lib/thread-idle-wake";
 
 export type { rpcContract };
 
@@ -319,27 +319,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   bb.events.on("thread.idle", async (event) => {
-    const threadId = event.thread.id;
-    const node = store.getNodeByThread(threadId);
-    if (!node) return;
-    store.appendLedger({
-      homeId: node.homeId,
-      threadId,
-      verb: "turn.end",
-      fsmState: projectFsm(store.tailLedger(threadId, 50).reverse()),
-    });
-    const home = store.getHome(node.homeId);
-    if (home && node.threadId !== home.mateThreadId) {
-      store.enqueueWake({
-        homeId: node.homeId,
-        threadId: home.mateThreadId,
-        targetMateId: home.primaryMateId,
-        reason: `thread.idle:${threadId}`,
-        priority: 2,
-        dedupeKey: `thread.idle:${threadId}`,
-      });
-    }
-    fleet.publish();
+    onThreadIdle(store, () => fleet.publish(), event.thread.id);
   });
 
   bb.events.on("turn.failed", async (event) => {
