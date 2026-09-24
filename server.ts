@@ -238,9 +238,7 @@ export default async function plugin(bb: BbPluginApi) {
       wakes: store.listWakes(input.homeId, input.acked),
     }),
     ackWake: (input) => {
-      fleet.assertHome(input.homeId);
-      store.ackWake(input.id);
-      fleet.publish();
+      fleet.ackWake(input.homeId, input.id);
       return null;
     },
     openHold: (input) => fleet.openHold(input),
@@ -282,6 +280,11 @@ export default async function plugin(bb: BbPluginApi) {
     },
     digest: (input) => fleet.buildDigest(input.homeId),
     bearings: (input) => fleet.buildBearings(input.homeId),
+    fleetSnapshot: (input) => fleet.fleetSnapshot(input.homeId),
+    fleetNavCounts: (input) => fleet.fleetNavCounts(input.homeId),
+    listDecisions: (input) => ({
+      decisions: fleet.listDecisions(input.homeId),
+    }),
     status: (input) => {
       const homeId = input.homeId ?? store.getSelectedHomeId();
       const homes = store.listHomes();
@@ -300,7 +303,14 @@ export default async function plugin(bb: BbPluginApi) {
         tree: fleet.buildTree(homeId),
       };
     },
-    inboxBadge: () => ({ count: store.countOpenInbox() }),
+    inboxBadge: () => {
+      const homeId = store.getSelectedHomeId();
+      if (!homeId) {
+        return { count: store.countOpenInbox(), wakes: 0, dead: 0 };
+      }
+      const nav = fleet.fleetNavCounts(homeId);
+      return { count: nav.inbox, wakes: nav.wakes, dead: nav.dead };
+    },
   });
 
   bb.events.on("thread.archived", async (event) => {
@@ -318,6 +328,17 @@ export default async function plugin(bb: BbPluginApi) {
       verb: "turn.end",
       fsmState: projectFsm(store.tailLedger(threadId, 50).reverse()),
     });
+    const home = store.getHome(node.homeId);
+    if (home && node.threadId !== home.mateThreadId) {
+      store.enqueueWake({
+        homeId: node.homeId,
+        threadId: home.mateThreadId,
+        targetMateId: home.primaryMateId,
+        reason: `thread.idle:${threadId}`,
+        priority: 2,
+        dedupeKey: `thread.idle:${threadId}`,
+      });
+    }
     fleet.publish();
   });
 

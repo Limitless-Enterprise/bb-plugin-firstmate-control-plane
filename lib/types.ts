@@ -79,6 +79,8 @@ export type TreeNode = FleetNode & {
   liveness: LivenessVerdict | null;
   depth: number;
   children: TreeNode[];
+  prUrl?: string | null;
+  profileLabel?: string | null;
 };
 
 export const treeNodeSchema: z.ZodType<TreeNode> = z.lazy(() =>
@@ -87,6 +89,8 @@ export const treeNodeSchema: z.ZodType<TreeNode> = z.lazy(() =>
     liveness: z.enum(livenessVerdicts).nullable(),
     depth: z.number(),
     children: z.array(treeNodeSchema),
+    prUrl: z.string().nullable().optional(),
+    profileLabel: z.string().nullable().optional(),
   }),
 );
 

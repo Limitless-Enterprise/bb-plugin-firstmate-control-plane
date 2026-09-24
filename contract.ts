@@ -324,6 +324,35 @@ export const rpcContract = defineRpcContract({
     input: z.object({ homeId: z.string() }),
     output: bearingsSchema,
   },
+  fleetSnapshot: {
+    input: z.object({ homeId: z.string() }),
+    output: z.object({
+      digest: digestSchema,
+      bearings: bearingsSchema,
+      generatedAtMs: z.number(),
+    }),
+  },
+  fleetNavCounts: {
+    input: z.object({ homeId: z.string() }),
+    output: z.object({
+      inbox: z.number(),
+      wakes: z.number(),
+      dead: z.number(),
+    }),
+  },
+  listDecisions: {
+    input: z.object({ homeId: z.string() }),
+    output: z.object({
+      decisions: z.array(
+        z.object({
+          threadId: z.string(),
+          key: z.string(),
+          raw: z.string(),
+          resolvedAtMs: z.number(),
+        }),
+      ),
+    }),
+  },
   status: {
     input: z.object({ homeId: z.string().optional() }),
     output: z.object({
@@ -335,7 +364,11 @@ export const rpcContract = defineRpcContract({
   },
   inboxBadge: {
     input: z.null(),
-    output: z.object({ count: z.number() }),
+    output: z.object({
+      count: z.number(),
+      wakes: z.number(),
+      dead: z.number(),
+    }),
   },
 });
 

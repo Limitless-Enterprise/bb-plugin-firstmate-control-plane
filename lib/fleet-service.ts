@@ -27,6 +27,7 @@ import {
   ledgerVerbFromStatus,
   parseStatusLine,
 } from "./status-verbs";
+import { wakeIdsToAckThrough } from "./fleet-bridge-helpers";
 import {
   MATE_DEFAULTS_KV_KEY,
   normalizeMateDefaults,
@@ -256,12 +257,29 @@ export class FleetService {
       const kids = (childrenOf.get(node.id) ?? []).map((child) =>
         toTree(child, depth + 1),
       );
+      const entries = this.store.tailLedger(node.threadId, 80).reverse();
+      const prEntry = entries.find(
+        (entry) =>
+          entry.verb === "pr.opened" &&
+          typeof entry.detail?.url === "string",
+      );
+      const prUrl =
+        prEntry && typeof prEntry.detail?.url === "string"
+          ? prEntry.detail.url
+          : null;
+      const profile = node.dispatchProfileId
+        ? this.store
+            .listProfiles(homeId)
+            .find((candidate) => candidate.id === node.dispatchProfileId)
+        : null;
       return {
         ...node,
         fsmState: this.fsmForThread(node.threadId),
         liveness: (liveness?.verdict as LivenessVerdict | undefined) ?? null,
         depth,
         children: kids,
+        prUrl,
+        profileLabel: profile?.label ?? null,
       };
     };
 
@@ -997,6 +1015,46 @@ export class FleetService {
     return this.store.countOpenHolds(homeId, threadId) > 0;
   }
 
+  ackWake(homeId: string, wakeId: string): void {
+    this.assertHome(homeId);
+    const wakes = this.store.listWakes(homeId, false);
+    const ids = wakeIdsToAckThrough(wakes, wakeId);
+    for (const id of ids) {
+      this.store.ackWake(id);
+    }
+    if (ids.length > 0) this.publish();
+  }
+
+  listDecisions(homeId: string) {
+    this.assertHome(homeId);
+    return this.store.listDecisions(homeId);
+  }
+
+  fleetSnapshot(homeId: string): {
+    digest: Digest;
+    bearings: Bearings;
+    generatedAtMs: number;
+  } {
+    return {
+      digest: this.buildDigest(homeId),
+      bearings: this.buildBearings(homeId),
+      generatedAtMs: Date.now(),
+    };
+  }
+
+  fleetNavCounts(homeId: string): {
+    inbox: number;
+    wakes: number;
+    dead: number;
+  } {
+    this.assertHome(homeId);
+    return {
+      inbox: this.store.countOpenInbox(homeId),
+      wakes: this.store.countUnackedWakes(homeId),
+      dead: this.store.countDeadNodes(homeId),
+    };
+  }
+
   buildBearings(homeId: string): Bearings {
     const digest = this.buildDigest(homeId);
     const home = this.store.getHome(homeId)!;
@@ -1067,11 +1125,19 @@ export class FleetService {
     const openHolds = this.store.listHolds(homeId, "open").length;
     const working = flat.filter((node) => node.fsmState === "working").length;
     const blocked = flat.filter((node) => node.fsmState === "blocked").length;
-    const summary = [
+    const primary = this.store.listNodes(homeId).find((n) => n.kind === "primary");
+    const mateLive = primary
+      ? this.store.getLiveness(primary.threadId)
+      : null;
+    const mateDown =
+      mateLive?.verdict === "dead" || mateLive?.verdict === "missing";
+    const summaryParts = [
       `${home.label} fleet digest`,
       `${working} working, ${blocked} blocked`,
       `${openInbox} inbox, ${openHolds} holds, ${unackedWakes} wakes`,
-    ].join(" · ");
+    ];
+    if (mateDown) summaryParts.unshift("MATE DOWN");
+    const summary = summaryParts.join(" · ");
     return {
       homeId,
       label: home.label,
@@ -1469,6 +1535,17 @@ export class FleetService {
       yolo: input.yolo,
       dispatchProfileId: profile?.id ?? null,
       envId: thread.environmentId ?? null,
+    });
+    await this.bb.sdk.threads.send({
+      threadId: thread.id,
+      mode: "auto",
+      input: [
+        {
+          type: "text",
+          text: `Launch brief (${input.role} · ${input.label}):\n\n${input.prompt}`,
+          mentions: [],
+        },
+      ],
     });
     return node;
   }

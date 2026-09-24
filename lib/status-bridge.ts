@@ -7,8 +7,8 @@ import {
   ledgerVerbFromStatus,
   parsePrUrl,
   parseStatusLine,
-  isChecksGreen,
 } from "./status-verbs";
+import { shouldEnqueuePrReadyWake } from "./fleet-bridge-helpers";
 
 type BridgeCursor = Record<string, number>;
 
@@ -88,10 +88,30 @@ export class StatusBridge {
           fsmState: fsm,
           detail: { line: parsed.raw, taskId },
         });
+      } else if (parsed.prefix === "note:") {
+        this.store.appendLedger({
+          homeId,
+          threadId,
+          verb: "crew.note",
+          fsmState: this.fleet.fsmForThread(threadId),
+          detail: { line: parsed.raw, taskId },
+        });
+      }
+
+      const home = this.store.getHome(homeId);
+      const node = this.store.getNodeByThread(threadId);
+
+      if (parsed.prefix === "resolved:" && parsed.decisionKey) {
+        this.store.recordDecision({
+          homeId,
+          threadId,
+          key: parsed.decisionKey,
+          raw: parsed.raw,
+          resolvedAtMs: Date.now(),
+        });
       }
 
       if (parsed.prefix === "needs-decision:") {
-        const home = this.store.getHome(homeId);
         if (home) {
           const title = parsed.detail.slice(0, 120) || taskId;
           const hasOpenHold = this.store
@@ -121,6 +141,19 @@ export class StatusBridge {
         });
       }
 
+      if (parsed.prefix === "done:" || parsed.prefix === "failed:") {
+        if (home) {
+          this.store.enqueueWake({
+            homeId,
+            threadId: home.mateThreadId,
+            targetMateId: home.primaryMateId,
+            reason: `terminal:${parsed.prefix}${taskId}`,
+            priority: parsed.prefix === "failed:" ? 8 : 5,
+            dedupeKey: `terminal:${threadId}:${parsed.prefix}`,
+          });
+        }
+      }
+
       if (parsed.prefix === "done:") {
         const prUrl = parsePrUrl(parsed.detail);
         if (prUrl) {
@@ -131,11 +164,12 @@ export class StatusBridge {
             fsmState: "done",
             detail: { url: prUrl, taskId },
           });
-          if (isChecksGreen(parsed.detail)) {
+          const mode = node?.deliveryMode ?? "no-mistakes";
+          if (shouldEnqueuePrReadyWake(mode, parsed.detail)) {
             this.store.enqueueWake({
               homeId,
               threadId,
-              targetMateId: this.store.getHome(homeId)?.primaryMateId ?? null,
+              targetMateId: home?.primaryMateId ?? null,
               reason: `pr.ready:${prUrl}`,
               priority: 6,
               dedupeKey: `pr.ready:${threadId}`,

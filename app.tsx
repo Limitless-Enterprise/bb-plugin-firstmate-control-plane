@@ -158,10 +158,12 @@ function InboxList({
   items,
   onOpen,
   onResolve,
+  onSnooze,
 }: {
   items: InboxItem[];
   onOpen: (threadId: string) => void;
   onResolve: (id: string) => void;
+  onSnooze: (id: string, untilMs: number) => void;
 }) {
   if (items.length === 0) {
     return (
@@ -187,6 +189,15 @@ function InboxList({
             </Button>
             <Button size="sm" variant="ghost" onClick={() => onResolve(item.id)}>
               Resolve
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                onSnooze(item.id, Date.now() + 3600_000)
+              }
+            >
+              Snooze 1h
             </Button>
           </div>
         </li>
@@ -247,7 +258,19 @@ function ThreadControls({
           </span>
         ) : null}
         {node.dispatchProfileId ? (
-          <span className="rounded bg-muted px-1.5 py-0.5">profile</span>
+          <span className="rounded bg-muted px-1.5 py-0.5">
+            {node.profileLabel ?? "profile"}
+          </span>
+        ) : null}
+        {node.prUrl ? (
+          <a
+            className="truncate rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-800 dark:text-emerald-200"
+            href={node.prUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            PR
+          </a>
         ) : null}
       </div>
       <form
@@ -329,7 +352,7 @@ function FleetPage({ subPath }: { subPath?: string }) {
   const [selectedHomeId, setSelectedHomeId] = useState<string | null>(null);
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
-  const [badge, setBadge] = useState(0);
+  const [badge, setBadge] = useState({ count: 0, wakes: 0, dead: 0 });
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("fleet");
   const [error, setError] = useState<string | null>(null);
@@ -345,7 +368,7 @@ function FleetPage({ subPath }: { subPath?: string }) {
       .catch((cause: unknown) =>
         setError(cause instanceof Error ? cause.message : String(cause)),
       );
-    rpc.call("inboxBadge", null).then((result) => setBadge(result.count));
+    rpc.call("inboxBadge", null).then((result) => setBadge(result));
   }, [rpc]);
 
   const refetchHome = useCallback(
@@ -413,9 +436,19 @@ function FleetPage({ subPath }: { subPath?: string }) {
       <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
         <Icon name="Ship" className="size-4 text-muted-foreground" />
         <span className="text-sm font-semibold">Fleet</span>
-        {badge > 0 ? (
+        {badge.count > 0 ? (
           <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-300">
-            {badge} inbox
+            {badge.count} inbox
+          </span>
+        ) : null}
+        {badge.wakes > 0 ? (
+          <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-xs text-blue-700 dark:text-blue-300">
+            {badge.wakes} wakes
+          </span>
+        ) : null}
+        {badge.dead > 0 ? (
+          <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs text-red-700 dark:text-red-300">
+            {badge.dead} dead
           </span>
         ) : null}
         <div className="ml-auto flex items-center gap-1">
@@ -492,6 +525,11 @@ function FleetPage({ subPath }: { subPath?: string }) {
             onResolve={(id) => {
               rpc
                 .call("resolveInbox", { homeId: selectedHomeId, id })
+                .then(() => refetchHome(selectedHomeId));
+            }}
+            onSnooze={(id, untilMs) => {
+              rpc
+                .call("snoozeInbox", { homeId: selectedHomeId, id, untilMs })
                 .then(() => refetchHome(selectedHomeId));
             }}
           />

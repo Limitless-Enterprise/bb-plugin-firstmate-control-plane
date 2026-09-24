@@ -37,6 +37,10 @@ describe("ledgerVerbFromStatus", () => {
   it("maps working to crew.working", () => {
     assert.equal(ledgerVerbFromStatus("working:"), "crew.working");
   });
+
+  it("maps note to crew.note", () => {
+    assert.equal(ledgerVerbFromStatus("note:"), "crew.note");
+  });
 });
 
 describe("parsePrUrl", () => {

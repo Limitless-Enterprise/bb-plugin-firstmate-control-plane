@@ -866,4 +866,68 @@ export class FleetStore {
       detail: row.detailJson ? JSON.parse(row.detailJson) : null,
     };
   }
+
+  recordDecision(input: {
+    homeId: string;
+    threadId: string;
+    key: string;
+    raw: string;
+    resolvedAtMs: number;
+  }): void {
+    const kvKey = `decisions:${input.homeId}`;
+    const row = this.db.prepare("SELECT value FROM kv WHERE key = ?").get(kvKey) as
+      | { value: string }
+      | undefined;
+    const list: unknown[] = row ? JSON.parse(row.value) : [];
+    list.push({
+      threadId: input.threadId,
+      key: input.key,
+      raw: input.raw,
+      resolvedAtMs: input.resolvedAtMs,
+    });
+    this.db
+      .prepare(
+        "INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      )
+      .run(kvKey, JSON.stringify(list));
+  }
+
+  listDecisions(homeId: string): {
+    threadId: string;
+    key: string;
+    raw: string;
+    resolvedAtMs: number;
+  }[] {
+    const row = this.db
+      .prepare("SELECT value FROM kv WHERE key = ?")
+      .get(`decisions:${homeId}`) as { value: string } | undefined;
+    if (!row) return [];
+    return JSON.parse(row.value) as {
+      threadId: string;
+      key: string;
+      raw: string;
+      resolvedAtMs: number;
+    }[];
+  }
+
+  countUnackedWakes(homeId: string): number {
+    const row = this.db
+      .prepare(
+        "SELECT COUNT(*) AS c FROM wakes WHERE home_id = ? AND acked = 0",
+      )
+      .get(homeId) as { c: number };
+    return row.c;
+  }
+
+  countDeadNodes(homeId: string): number {
+    const nodes = this.listNodes(homeId);
+    let dead = 0;
+    for (const node of nodes) {
+      const live = this.getLiveness(node.threadId);
+      if (live && (live.verdict === "dead" || live.verdict === "missing")) {
+        dead += 1;
+      }
+    }
+    return dead;
+  }
 }
