@@ -36,8 +36,9 @@ Use **`bin/fm-teardown.sh`** as documented in AGENTS.md.
 
 When integration is enabled and `state/<task>.meta` has `backend=bb`, the wrapper
 refuses (exit 2) while `bb fleet hold list` reports open holds on the crew thread,
-then skips treehouse pool return (BB owns the worktree env), attempts `bb fleet detach`
-for the crew thread, and runs native teardown. Re-run teardown with meta already
+then skips treehouse pool return (BB owns the worktree env), runs `bb fleet detach`
+for the crew thread (must succeed — archives the BB thread; exits non-zero on failure,
+skipping native teardown), then runs native teardown. Re-run teardown with meta already
 cleared still uses the BB path when `state/<task>.backlog-close` exists or
 `config/backend=bb`. If native teardown fails after meta is gone but
 `state/<task>.backlog-close` remains, the wrapper clears that marker and exits 0

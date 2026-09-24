@@ -203,7 +203,13 @@ if [ -n "$prof" ]; then
   fi
   prof_tid=$(bb fleet tree --mate "$MATE" --json 2>/dev/null \
     | jq -r '.. | objects | select(.label?=="m1-prof-test") | .threadId' | head -1)
-  [ -n "$prof_tid" ] && bb fleet detach --mate "$MATE" --thread "$prof_tid" >/dev/null 2>&1 || true
+  if [ -n "$prof_tid" ]; then
+    if bb fleet detach --mate "$MATE" --thread "$prof_tid" >/dev/null 2>&1; then
+      record P8-3 pass "profile test crew detach/archive ok"
+    else
+      record P8-3 fail "profile test crew detach/archive failed"
+    fi
+  fi
 else
   record P8-1 fail "profiles unavailable"
   record P8-2 fail "skipped"
