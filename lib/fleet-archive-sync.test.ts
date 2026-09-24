@@ -45,13 +45,7 @@ function mockFleetService(
     holds?: Hold[];
     bbThreads?: Partial<BbThreads>;
   } = {},
-): {
-  fleet: FleetService;
-  ledger: LedgerRow[];
-  deleted: string[];
-  holds: Hold[];
-  bbEvents: string[];
-} {
+) {
   const ledger: LedgerRow[] = [];
   const deleted: string[] = [];
   const holds = [...(options.holds ?? [])];

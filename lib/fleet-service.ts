@@ -1378,7 +1378,7 @@ export class FleetService {
     }
   }
 
-  /** BB→Fleet close-out (P-SYNC-1): resolve open holds, then remove registry node. */
+  /** BB→Fleet close-out (P-SYNC-1): resolve holds, clear inbox/wakes, remove node. */
   closeOutRegistryForArchivedThread(threadId: string): boolean {
     const node = this.store.getNodeByThread(threadId);
     if (!node || node.kind === "primary") return false;
@@ -1412,7 +1412,7 @@ export class FleetService {
     }
   }
 
-  /** Fleet→BB close-out (P-SYNC-1): stop thread, archive via BB SDK, then delete node. */
+  /** Fleet→BB close-out (P-SYNC-1): stop, archive (must succeed), clear inbox/wakes, delete node. */
   async detachCrew(homeId: string, threadId: string): Promise<void> {
     this.assertHome(homeId);
     const node = this.store.getNodeByThread(threadId);

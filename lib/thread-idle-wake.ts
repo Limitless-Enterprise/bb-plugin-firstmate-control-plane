@@ -37,7 +37,12 @@ export function onThreadIdle(
     homeId: node.homeId,
     threadId,
     verb: "turn.end",
-    fsmState: projectFsm(store.tailLedger(threadId, 50).reverse()),
+    fsmState: projectFsm(
+      store.tailLedger(threadId, 50).reverse().map((entry) => ({
+        verb: entry.verb,
+        fsmState: entry.fsmState ?? "idle",
+      })),
+    ),
   });
   const home = store.getHome(node.homeId);
   if (home && node.threadId !== home.mateThreadId) {

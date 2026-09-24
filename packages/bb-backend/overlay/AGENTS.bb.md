@@ -59,8 +59,8 @@ bb fleet bearings --mate <homeId>
 
 The status bridge watches `state/<task-id>.status` on this mate checkout.
 Ledger updates: `working:`, `done:` (incl. PR URLs), `failed:`, `blocked:`,
-`paused:`, `needs-decision:` (opens holds), and `resolved:`. `note:` lines are
-not ingested yet.
+`paused:`, `needs-decision:` (opens holds), `resolved:`, and `note:` (appends
+`crew.note` ledger entries).
 
 ## Configuration
 

@@ -17,11 +17,11 @@ The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it 
 
 | ID | Capability | Verify |
 |----|------------|--------|
-| P-SYNC-1 | BB ↔ Fleet close-out (`thread.archived` → registry; `detachCrew` → BB archive) | unit: `fleet-archive-sync.test.ts`; live: archive child thread → node removed; detach → thread archived (not deleted) |
+| P-SYNC-1 | BB ↔ Fleet close-out (`thread.archived` → registry; `detachCrew` → BB archive) | unit: `fleet-archive-sync.test.ts` (resolve holds; clear inbox incl. snoozed; ack crew- and mate-targeted wakes; detach archives before `deleteNode`, fail-closed on archive error); live: archive child thread → node removed; detach → thread archived (not deleted) |
 
 ## Inventory traceability
 
-Every **B-***, **P-***, and **U-*** row in `CAPABILITY_INVENTORY.md` with M1 ✓ must be **✅** in the inventory table. Run `./scripts/m1-inventory-gate.sh` before merge to `main`.
+Every **B-*** and **P-*** row in `CAPABILITY_INVENTORY.md` with **M1 ✓** must be **✅** in the inventory table. Run `./scripts/m1-inventory-gate.sh` before merge to `main`.
 
 **Integrity:** Do not mark **M1 ✓** inventory rows ✅ without executable evidence
 (unit test, `scripts/m1-ac-full.sh` check, or live mate verification). Doc-only
