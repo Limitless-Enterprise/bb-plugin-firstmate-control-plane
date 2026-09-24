@@ -1350,10 +1350,25 @@ export class FleetService {
   closeOutRegistryForArchivedThread(threadId: string): boolean {
     const node = this.store.getNodeByThread(threadId);
     if (!node || node.kind === "primary") return false;
+    const resolvedHoldIds: string[] = [];
     for (const hold of this.store
       .listHolds(node.homeId, "open")
       .filter((candidate) => candidate.threadId === threadId)) {
+      resolvedHoldIds.push(hold.id);
       this.resolveHold(node.homeId, hold.id);
+    }
+    for (const item of this.store.listInbox(node.homeId, "open")) {
+      if (item.threadId === threadId) {
+        this.store.resolveInbox(item.id);
+      }
+    }
+    for (const wake of this.store.listWakes(node.homeId, false)) {
+      if (
+        wake.threadId === threadId ||
+        resolvedHoldIds.some((holdId) => wake.dedupeKey === `hold:${holdId}`)
+      ) {
+        this.store.ackWake(wake.id);
+      }
     }
     this.store.appendLedger({
       homeId: node.homeId,
@@ -1538,12 +1553,31 @@ export class FleetService {
         ],
       });
     } catch (error) {
+      let archiveFailed: unknown;
       try {
-        await this.bb.sdk.threads.stop({ threadId: thread.id });
-      } catch {
-        // thread may already be stopped
+        await this.archiveBbThread(thread.id);
+      } catch (archiveError) {
+        archiveFailed = archiveError;
+        this.bb.log.warn(
+          `fleet: rollback archive after send failure ${thread.id}: ${archiveError}`,
+        );
+      } finally {
+        try {
+          await this.bb.sdk.threads.stop({ threadId: thread.id });
+        } catch {
+          // thread may already be stopped
+        }
       }
-      await this.archiveBbThread(thread.id);
+      if (archiveFailed !== undefined) {
+        const detail =
+          archiveFailed instanceof Error
+            ? archiveFailed.message
+            : String(archiveFailed);
+        throw new Error(
+          `Launch brief send failed and rollback archive failed for ${thread.id}: ${detail}`,
+          { cause: error },
+        );
+      }
       throw error;
     }
     return this.attachCrew({

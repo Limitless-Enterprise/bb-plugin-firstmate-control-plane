@@ -188,9 +188,9 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-H7 | Authority escalation → CoS | ✓ | 🔲 |
 | P-H8 | Fleet Inbox tab | ✓ | ✅ |
 | P-H9 | Inbox filters | ✓ | 🔲 |
-| P-H10 | Snooze / resolve / reply | ✓ | ✅ |
+| P-H10 | Snooze / resolve / reply | ✓ | ⚠ |
 | P-H11 | Deep links /fleet/inbox | ✓ | ⚠ |
-| P-H12 | Nav badge inbox count | ✓ | ✅ |
+| P-H12 | Nav badge inbox count | ✓ | ⚠ |
 | P-H13 | CLI inbox | ✓ | ✅ |
 | P-H14 | Needs-decision rail strip | ✓ | ⚠ |
 
@@ -223,9 +223,9 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-U9 | Realtime refresh | ✓ | ⚠ |
 | P-U10 | Fleet settings | ✓ | ⚠ |
 | P-U11 | Spawn UI profile picker | ✓ | 🔲 |
-| P-U12 | Overflow interrupt/exit/relaunch | ✓ | ✅ |
-| P-U13 | Composer steer in panel | ✓ | ✅ |
-| P-U14 | Nav badges (inbox/wakes/dead) | ✓ | ✅ |
+| P-U12 | Overflow interrupt/exit/relaunch | ✓ | ⚠ |
+| P-U13 | Composer steer in panel | ✓ | ⚠ |
+| P-U14 | Nav badges (inbox/wakes/dead) | ✓ | ⚠ |
 | P-U15 | Home switcher | M2 | ⚠ |
 | P-U16 | Unified cross-home inbox | M2 | 🔲 |
 | P-U17 | Secondmate indent tree | M3 | 🔲 |
@@ -239,7 +239,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-C2 | bb fleet bearings | ✓ | ✅ |
 | P-C3 | Full digest builder | ✓ | ✅ |
 | P-C4 | CoS notify mate down | ✓ | ✅ |
-| P-C5 | Fleet snapshot API | ✓ | ✅ |
+| P-C5 | Fleet snapshot API | ✓ | ⚠ |
 
 ---
 

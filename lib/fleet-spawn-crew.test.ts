@@ -30,6 +30,7 @@ const PRIMARY: FleetNode = {
 
 function spawnFleet(options: {
   sendError?: Error;
+  archiveError?: Error;
   onSend?: () => void;
   onAttach?: () => void;
 }) {
@@ -91,6 +92,7 @@ function spawnFleet(options: {
           },
           archive: async ({ threadId }: { threadId: string }) => {
             bbEvents.push(`archive:${threadId}`);
+            if (options.archiveError) throw options.archiveError;
           },
         },
       },
@@ -139,7 +141,27 @@ describe("spawnCrew launch brief (B-S3)", () => {
     assert.ok(!bbEvents.some((e) => e.startsWith("insertNode:")));
     assert.deepEqual(
       bbEvents.filter((e) => e.includes("thr_spawned")),
-      ["spawn:thr_spawned", "send:thr_spawned", "stop:thr_spawned", "archive:thr_spawned"],
+      ["spawn:thr_spawned", "send:thr_spawned", "archive:thr_spawned", "stop:thr_spawned"],
     );
+  });
+
+  it("stops spawned thread and throws when rollback archive fails", async () => {
+    const { fleet, bbEvents, nodes } = spawnFleet({
+      sendError: new Error("send failed"),
+      archiveError: new Error("archive down"),
+    });
+    await assert.rejects(
+      () =>
+        fleet.spawnCrew({
+          homeId: "tech",
+          label: "alpha",
+          role: "ship",
+          prompt: "do work",
+        }),
+      /rollback archive failed.*archive down/,
+    );
+    assert.equal(nodes.size, 1);
+    assert.ok(bbEvents.includes("stop:thr_spawned"));
+    assert.ok(bbEvents.includes("archive:thr_spawned"));
   });
 });

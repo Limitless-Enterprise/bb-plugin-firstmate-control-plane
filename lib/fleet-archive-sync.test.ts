@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { FleetService } from "./fleet-service";
-import type { FleetNode, Hold } from "./types";
+import type { FleetNode, Hold, InboxItem, Wake } from "./types";
 
 type LedgerRow = {
   threadId: string;
@@ -110,6 +110,89 @@ function mockFleetService(
       }
     },
     upsertInboxFromHold(_item: Hold): void {},
+    inbox: [] as InboxItem[],
+    wakes: [] as Wake[],
+    createInboxItem(input: {
+      homeId: string;
+      threadId: string;
+      kind: InboxItem["kind"];
+      title: string;
+      body: string;
+    }): InboxItem {
+      const item: InboxItem = {
+        id: `inbox-${store.inbox.length + 1}`,
+        homeId: input.homeId,
+        holdId: null,
+        threadId: input.threadId,
+        kind: input.kind,
+        urgency: "normal",
+        title: input.title,
+        body: input.body,
+        state: "open",
+        snoozedUntilMs: null,
+        createdAtMs: 1,
+        resolvedAtMs: null,
+      };
+      store.inbox.push(item);
+      return item;
+    },
+    listInbox(homeId: string, state?: InboxItem["state"]): InboxItem[] {
+      return store.inbox.filter(
+        (item) =>
+          item.homeId === homeId && (state === undefined || item.state === state),
+      );
+    },
+    resolveInbox(id: string): void {
+      const item = store.inbox.find((candidate) => candidate.id === id);
+      if (item) {
+        item.state = "resolved";
+        item.resolvedAtMs = Date.now();
+      }
+    },
+    countOpenInbox(homeId: string): number {
+      return store.inbox.filter(
+        (item) => item.homeId === homeId && item.state === "open",
+      ).length;
+    },
+    enqueueWake(input: {
+      homeId: string;
+      threadId?: string | null;
+      reason: string;
+      dedupeKey?: string | null;
+    }): string {
+      const wake: Wake = {
+        id: `wake-${store.wakes.length + 1}`,
+        homeId: input.homeId,
+        threadId: input.threadId ?? null,
+        targetMateId: null,
+        reason: input.reason,
+        priority: 0,
+        dedupeKey: input.dedupeKey ?? null,
+        acked: false,
+        createdAtMs: 1,
+      };
+      store.wakes.push(wake);
+      return wake.id;
+    },
+    listWakes(homeId: string, acked?: boolean): Wake[] {
+      return store.wakes.filter(
+        (wake) =>
+          wake.homeId === homeId &&
+          (acked === undefined || wake.acked === acked),
+      );
+    },
+    ackWake(id: string): void {
+      const wake = store.wakes.find((candidate) => candidate.id === id);
+      if (wake) wake.acked = true;
+    },
+    countUnackedWakes(homeId: string): number {
+      return store.wakes.filter(
+        (wake) => wake.homeId === homeId && !wake.acked,
+      ).length;
+    },
+    countDeadNodes(_homeId: string): number {
+      return 0;
+    },
   };
 
   const fleet = new FleetService(
@@ -120,7 +203,7 @@ function mockFleetService(
     } as never,
     store as never,
   );
-  return { fleet, ledger, deleted, holds, bbEvents };
+  return { fleet, ledger, deleted, holds, bbEvents, store };
 }
 
 describe("Fleet archive sync (P-SYNC-1)", () => {
@@ -132,6 +215,47 @@ describe("Fleet archive sync (P-SYNC-1)", () => {
     assert.equal(ledger[0]?.verb, "thread.archived");
     assert.equal(ledger[0]?.fsmState, "stopped");
     assert.equal(nodes.size, 0);
+  });
+
+  it("clears open inbox and unacked wakes on BB archive close-out", () => {
+    const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
+    const openHold: Hold = {
+      id: "hold-1",
+      homeId: "tech",
+      mateId: "mate-1",
+      threadId: "thr_crew",
+      title: "blocked",
+      body: "wait",
+      urgency: "normal",
+      state: "open",
+      createdAtMs: 1,
+      resolvedAtMs: null,
+    };
+    const { fleet, store } = mockFleetService(nodes, { holds: [openHold] });
+    store.createInboxItem({
+      homeId: "tech",
+      threadId: "thr_crew",
+      kind: "wake",
+      title: "Turn failed",
+      body: "failed",
+    });
+    store.enqueueWake({
+      homeId: "tech",
+      threadId: "thr_crew",
+      reason: "turn.failed",
+      dedupeKey: "turn.failed:thr_crew",
+    });
+    store.enqueueWake({
+      homeId: "tech",
+      threadId: TECH_HOME.mateThreadId,
+      reason: "hold:hold-1",
+      dedupeKey: "hold:hold-1",
+    });
+    assert.equal(fleet.fleetNavCounts("tech").inbox, 1);
+    assert.equal(fleet.fleetNavCounts("tech").wakes, 2);
+    assert.equal(fleet.closeOutRegistryForArchivedThread("thr_crew"), true);
+    assert.equal(fleet.fleetNavCounts("tech").inbox, 0);
+    assert.equal(fleet.fleetNavCounts("tech").wakes, 0);
   });
 
   it("resolves open holds before registry close-out on BB archive", () => {
