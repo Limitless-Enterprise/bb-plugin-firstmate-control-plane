@@ -187,4 +187,31 @@ describe("StatusBridge scan (M1 bridge gaps)", () => {
     await bridge.scanMateHome(HOME.homeId, [checkout]);
     assert.ok(wakes.some((wake) => wake.reason.startsWith("pr.ready:")));
   });
+
+  it("enqueues blocked: wake tied to crew thread", async () => {
+    const line = "blocked: waiting on review";
+    const checkout = await checkoutWithStatus("t1", line);
+    const { bridge, wakes } = bridgeHarness({});
+    await bridge.scanMateHome(HOME.homeId, [checkout]);
+    assert.ok(
+      wakes.some(
+        (wake) =>
+          wake.threadId === CREW.threadId &&
+          wake.dedupeKey === `blocked:thr_crew:${line}`,
+      ),
+    );
+  });
+
+  it("enqueues mate wake on terminal failed:", async () => {
+    const checkout = await checkoutWithStatus("t1", "failed: pipeline broke");
+    const { bridge, wakes } = bridgeHarness({});
+    await bridge.scanMateHome(HOME.homeId, [checkout]);
+    assert.ok(
+      wakes.some(
+        (wake) =>
+          wake.threadId === HOME.mateThreadId &&
+          wake.dedupeKey === "terminal:thr_crew:failed:",
+      ),
+    );
+  });
 });

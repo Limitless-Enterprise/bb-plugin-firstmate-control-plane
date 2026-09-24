@@ -71,7 +71,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | ID | Capability | M1 | Status |
 |---|---|---|---|
 | B-ST1 | Ingest state/<id>.status | ✓ | ✅ |
-| B-ST2 | All status verbs | ✓ | ✅ |
+| B-ST2 | All status verbs | ✓ | ⚠ |
 | B-ST3 | OPEN DECISIONS fold | ✓ | ✅ |
 | B-ST4 | Status vs backlog divergence | ✓ | 🔲 |
 | B-ST5 | PR ready lines → poller | ✓ | ✅ |
@@ -152,7 +152,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 |---|---|---|---|
 | P-V1 | bb fleet probe / liveness | ✓ | ✅ |
 | P-V2 | Verdicts alive/dead/missing/ambiguous | ✓ | ✅ |
-| P-V3 | Full probe pipeline | ✓ | ✅ |
+| P-V3 | Full probe pipeline | ✓ | ⚠ |
 | P-V4 | Desync reconciliation | ✓ | 🔲 |
 | P-V5 | Never respawn ambiguous | ✓ | ✅ |
 | P-V6 | Auto-respawn dead/missing | ✓ | ✅ |
@@ -189,7 +189,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-H8 | Fleet Inbox tab | ✓ | ✅ |
 | P-H9 | Inbox filters | ✓ | 🔲 |
 | P-H10 | Snooze / resolve / reply | ✓ | ⚠ |
-| P-H11 | Deep links /fleet/inbox | ✓ | ✅ |
+| P-H11 | Deep links /fleet/inbox | ✓ | ⚠ |
 | P-H12 | Nav badge inbox count | ✓ | ✅ |
 | P-H13 | CLI inbox | ✓ | ✅ |
 | P-H14 | Needs-decision rail strip | ✓ | ⚠ |
@@ -199,8 +199,8 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | ID | Capability | M1 | Status |
 |---|---|---|---|
 | P-P1 | Parse done: PR | ✓ | ✅ |
-| P-P2 | PR/CI poller | ✓ | ✅ |
-| P-P3 | Checks pending/green/failed wakes | ✓ | ✅ |
+| P-P2 | PR/CI poller | ✓ | ⚠ |
+| P-P3 | Checks pending/green/failed wakes | ✓ | ⚠ |
 | P-P4 | Mode-aware ready | ✓ | ✅ |
 | P-P5 | Merge outcome retire poll | ✓ | 🔲 |
 | P-P6 | Held for merge | ✓ | 🔲 |

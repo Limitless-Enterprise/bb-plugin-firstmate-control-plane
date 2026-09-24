@@ -380,6 +380,60 @@ describe("Fleet archive sync (P-SYNC-1)", () => {
     assert.equal(fleet.fleetNavCounts("tech").wakes, 0);
   });
 
+  it("resolveHold acks mate hold wake", () => {
+    const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
+    const openHold: Hold = {
+      id: "hold-open",
+      homeId: "tech",
+      mateId: "mate-1",
+      threadId: "thr_crew",
+      title: "blocked",
+      body: "",
+      urgency: "normal",
+      state: "open",
+      createdAtMs: 1,
+      resolvedAtMs: null,
+    };
+    const { fleet, store } = mockFleetService(nodes, { holds: [openHold] });
+    store.enqueueWake({
+      homeId: "tech",
+      threadId: TECH_HOME.mateThreadId,
+      reason: "hold:hold-open",
+      dedupeKey: "hold:hold-open",
+    });
+    assert.equal(fleet.fleetNavCounts("tech").wakes, 1);
+    fleet.resolveHold("tech", "hold-open");
+    assert.equal(fleet.fleetNavCounts("tech").wakes, 0);
+  });
+
+  it("detachCrew clears pre-resolved hold mate wakes", async () => {
+    const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
+    const resolvedHold: Hold = {
+      id: "hold-resolved",
+      homeId: "tech",
+      mateId: "mate-1",
+      threadId: "thr_crew",
+      title: "was blocked",
+      body: "",
+      urgency: "normal",
+      state: "resolved",
+      createdAtMs: 1,
+      resolvedAtMs: 2,
+    };
+    const { fleet, store } = mockFleetService(nodes, {
+      holds: [resolvedHold],
+    });
+    store.enqueueWake({
+      homeId: "tech",
+      threadId: TECH_HOME.mateThreadId,
+      reason: "hold:hold-resolved",
+      dedupeKey: "hold:hold-resolved",
+    });
+    assert.equal(fleet.fleetNavCounts("tech").wakes, 1);
+    await fleet.detachCrew("tech", "thr_crew");
+    assert.equal(fleet.fleetNavCounts("tech").wakes, 0);
+  });
+
   it("detachCrew leaves registry node when BB archive fails", async () => {
     const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
     const { fleet, deleted } = mockFleetService(nodes, {

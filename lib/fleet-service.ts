@@ -1021,6 +1021,11 @@ export class FleetService {
     const holdsBefore = this.store.listHolds(homeId, "open");
     const hold = holdsBefore.find((candidate) => candidate.id === holdId);
     this.store.resolveHold(holdId);
+    for (const wake of this.store.listWakes(homeId, false)) {
+      if (wake.dedupeKey === `hold:${holdId}`) {
+        this.store.ackWake(wake.id);
+      }
+    }
     if (hold) {
       this.store.upsertInboxFromHold({
         ...hold,
@@ -1367,6 +1372,14 @@ export class FleetService {
     return updated;
   }
 
+  private holdIdsForThread(homeId: string, threadId: string): string[] {
+    const open = this.store.listHolds(homeId, "open");
+    const resolved = this.store.listHolds(homeId, "resolved");
+    return [...open, ...resolved]
+      .filter((hold) => hold.threadId === threadId)
+      .map((hold) => hold.id);
+  }
+
   private clearCrewThreadInboxAndWakes(
     homeId: string,
     crewThreadId: string,
@@ -1437,7 +1450,11 @@ export class FleetService {
       // thread may already be stopped
     }
     await this.archiveBbThread(threadId);
-    this.clearCrewThreadInboxAndWakes(homeId, threadId, []);
+    this.clearCrewThreadInboxAndWakes(
+      homeId,
+      threadId,
+      this.holdIdsForThread(homeId, threadId),
+    );
     this.store.deleteNode(node.id);
     this.publish();
   }
