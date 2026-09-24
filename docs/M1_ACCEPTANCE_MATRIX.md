@@ -2,7 +2,7 @@
 
 **Rule:** M1 is complete only when every row in `docs/CAPABILITY_INVENTORY.md` marked **M1 ✓** is **✅** and `scripts/m1-inventory-gate.sh` passes.
 
-The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it is not sufficient alone.
+The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it is not sufficient alone. Smoke check IDs and pass criteria live in that script’s `record` calls (formerly listed in IMPLEMENTATION_PLAN §8).
 
 ## Verification kinds
 

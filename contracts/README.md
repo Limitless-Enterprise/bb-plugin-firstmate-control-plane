@@ -184,8 +184,9 @@ When `enabled: true`, ship/scout spawns call `bb fleet spawn` and register crew 
 For crews with `backend=bb` in task meta (or re-run teardown when meta is already
 gone but `state/<task>.backlog-close` or `config/backend=bb` indicates BB), `fm-teardown`
 refuses (exit 2) while `bb fleet hold list` reports `openCount > 0` for the crew
-thread, then skips treehouse pool return, detaches the BB thread, and runs native
-teardown. If native
+thread, then skips treehouse pool return, runs `bb fleet detach` (must succeed —
+archives the BB thread; aborts teardown on failure), and runs native teardown.
+Teardown details: `packages/bb-backend/overlay/AGENTS.bb.md`. If native
 teardown fails after meta is cleared but `state/<task>.backlog-close` remains (ad-hoc scouts
 absent from tasks-axi), the wrapper removes the marker and exits 0. `fm-spawn --relaunch` and
 `--secondmate` still use native Firstmate backends; crew relaunch on BB threads is

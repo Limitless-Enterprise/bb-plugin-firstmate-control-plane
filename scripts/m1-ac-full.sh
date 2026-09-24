@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M1 full acceptance suite — every phase exit criterion + §8 smoke path (24 checks).
+# M1 acceptance smoke — 24 live checks; not sufficient alone (run scripts/m1-inventory-gate.sh).
 # Requires: FM_HOME, bb CLI, jq, pnpm (for unit tests), integration applied.
 set -u
 

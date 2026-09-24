@@ -1,6 +1,6 @@
 # Firstmate × BB — consolidated implementation plan
 
-**Status:** Executing · **Target:** M1 complete · **Updated:** 2026-09-20
+**Status:** Executing · **Target:** M1 complete · **Updated:** 2026-09-24
 
 ## 1. What we are building
 
