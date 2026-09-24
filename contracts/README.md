@@ -182,9 +182,9 @@ Resolving the last open hold on a thread appends `mark.idle` and clears blocked 
 **Fleet panel RPCs** (see `contract.ts`): `fleetSnapshot` returns
 `{ digest, bearings, generatedAtMs }` for a home; `fleetNavCounts` returns
 `{ inbox, wakes, dead }` for sidebar badges when scoped to a home. `inboxBadge`:
-with a selected home, same three fields from `fleetNavCounts`; with no home
-selected, `count` is open inbox across all homes and `wakes` / `dead` are `0`
-(select a home for wake/dead badges).
+with a selected home, returns `count` / `wakes` / `dead` from `fleetNavCounts`
+for that home; with no home selected, sums those three fields from
+`fleetNavCounts` across every registered home.
 
 ## Isolation
 
