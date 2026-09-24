@@ -9,7 +9,7 @@ The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it 
 | Kind | Meaning |
 |------|---------|
 | **live** | `scripts/m1-ac-full.sh` or `m1-ac-live-*` against `tech` mate |
-| **unit** | `pnpm test` (`lib/*.test.ts` + `scripts/bb-backend-m1-contract.sh` for overlay B-O8/B-O9/B-O10 fail-closed) |
+| **unit** | `pnpm test` (`lib/*.test.ts` + `scripts/bb-backend-m1-contract.sh` for overlay B-O8/B-O9/B-O10 fail-closed). Partial-row evidence (still ⚠ in inventory): P-R7 `mate-checkout-paths.test.ts`; B-ST2 `status-verbs.test.ts` + `status-bridge.test.ts`; P-P2/P-P3 `pr-poller.test.ts` (helpers only until poller behavior tests land) |
 | **lint** | `pnpm run typecheck` + repo linters |
 | **doc** | File present and matches behavior |
 

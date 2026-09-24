@@ -181,8 +181,10 @@ Resolving the last open hold on a thread appends `mark.idle` and clears blocked 
 
 **Fleet panel RPCs** (see `contract.ts`): `fleetSnapshot` returns
 `{ digest, bearings, generatedAtMs }` for a home; `fleetNavCounts` returns
-`{ inbox, wakes, dead }` for sidebar badges. `inboxBadge` aggregates across
-homes when no home is selected.
+`{ inbox, wakes, dead }` for sidebar badges when scoped to a home. `inboxBadge`:
+with a selected home, same three fields from `fleetNavCounts`; with no home
+selected, `count` is open inbox across all homes and `wakes` / `dead` are `0`
+(select a home for wake/dead badges).
 
 ## Isolation
 
@@ -213,8 +215,9 @@ Teardown details: `packages/bb-backend/overlay/AGENTS.bb.md`. If native
 teardown fails after meta is cleared but `state/<task>.backlog-close` remains (ad-hoc scouts
 absent from tasks-axi), the wrapper removes the marker and exits 0. `fm-spawn --relaunch` and
 `--secondmate` still use native Firstmate backends; crew relaunch on BB threads is
-via `bb fleet relaunch` or Fleet UI controls. Status bridge
-watches `<mate-checkout>/state/<id>.status` for `working:`, `done:`, `failed:`,
+via `bb fleet relaunch` or Fleet UI controls. Status bridge resolves mate
+registry and environment checkout paths (`lib/mate-checkout-paths.ts`), scans each
+`state/<id>.status` for `working:`, `done:`, `failed:`,
 `blocked:`, `paused:`, `needs-decision:`, `resolved:`, and `note:` (`note:` appends
 `crew.note` ledger entries; other prefixes map per `lib/status-verbs.ts`).
 PR poller watches GitHub checks.
@@ -233,7 +236,8 @@ See `packages/bb-backend/overlay/README.md` for the installed file tree.
 | `staleIdleSec` | 1800 | 60 |
 | `autoRespawn` | false | — |
 
-Status bridge scans mate checkout `state/*.status` on this interval; liveness probes
+Status bridge scans `state/*.status` on every resolved mate checkout path on this
+interval; liveness probes
 run on `probeIntervalSec`. The `fleet-supervisor` background service holds a
 session lock (`fleet.supervisor.lock`), probes threads each cycle, and enqueues
 busy-age stall / stale-idle wakes using ledger semantics (semantic blocked and

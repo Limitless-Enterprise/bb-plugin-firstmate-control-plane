@@ -37,4 +37,6 @@ Replace the v1 `integration/bin/fm-spawn.sh` stub with:
    (Escape|C-c), kill, agent_state; `fm-teardown-wrap` + treehouse shim for BB
    teardown
 
-See `docs/IMPLEMENTATION_PLAN.md` Phase 1.
+See `docs/IMPLEMENTATION_PLAN.md` Phase 1. M1 overlay fail-closed checks
+(B-O8/B-O9 and partial B-O10 arms) run via `scripts/bb-backend-m1-contract.sh`
+as part of `pnpm test`.
