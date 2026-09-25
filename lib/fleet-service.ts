@@ -1395,7 +1395,29 @@ export class FleetService {
         result = await this.sendSteerText(row.threadId, row.text);
         attempts = this.store.incrementSteerAttempt(row.id);
       }
-      if (result !== "sent") continue;
+      if (result !== "sent") {
+        this.store.markSteerFailed(row.id);
+        const node = this.store.getNodeByThread(row.threadId);
+        const label = node?.label ?? row.threadId;
+        if (typeof this.store.createInboxItem === "function") {
+          this.store.createInboxItem({
+            homeId,
+            threadId: row.threadId,
+            kind: "wake",
+            urgency: "high",
+            title: `Steer delivery failed: ${label}`,
+            body: row.text,
+          });
+        }
+        this.store.appendLedger({
+          homeId,
+          threadId: row.threadId,
+          verb: "steer.failed",
+          fsmState: this.fsmForThread(row.threadId),
+          detail: { queued: true, attempts },
+        });
+        continue;
+      }
       this.store.markSteerSent(row.id);
       this.store.appendLedger({
         homeId,

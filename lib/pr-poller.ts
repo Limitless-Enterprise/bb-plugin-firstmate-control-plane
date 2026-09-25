@@ -4,17 +4,19 @@ import type { FleetService } from "./fleet-service";
 import type { FleetStore } from "./db";
 import { parsePrUrl } from "./status-verbs";
 import {
+  lifecycleLedgerVerb,
+  lifecycleWakeReason,
+  prStateFromSnapshot,
   shouldRetirePollAfterMerge,
   type GhPrSnapshot,
+  type PrLifecycleState,
 } from "./pr-github-events";
 
 const execFileAsync = promisify(execFile);
 
 type GhCheckState = "SUCCESS" | "FAILURE" | "PENDING" | "ERROR";
 
-async function ghPrCheckState(
-  prUrl: string,
-): Promise<GhCheckState | "unavailable"> {
+async function ghPrSnapshot(prUrl: string): Promise<GhPrSnapshot | null> {
   try {
     const { stdout } = await execFileAsync(
       "gh",
@@ -27,24 +29,41 @@ async function ghPrCheckState(
       ],
       { timeout: 15_000 },
     );
-    const payload = JSON.parse(stdout) as GhPrSnapshot & {
+    return JSON.parse(stdout) as GhPrSnapshot & {
       statusCheckRollup?: { state?: string }[];
     };
-    if (payload.state === "MERGED") {
-      return "SUCCESS";
-    }
-    const rollup = payload.statusCheckRollup ?? [];
-    if (rollup.length === 0) return "PENDING";
-    if (rollup.some((item) => item.state === "FAILURE")) return "FAILURE";
-    if (rollup.every((item) => item.state === "SUCCESS")) return "SUCCESS";
-    return "PENDING";
   } catch {
-    return "unavailable";
+    return null;
   }
 }
 
+function checkStateFromSnapshot(
+  payload: GhPrSnapshot & { statusCheckRollup?: { state?: string }[] },
+): GhCheckState | "unavailable" {
+  if (payload.state === "MERGED") {
+    return "SUCCESS";
+  }
+  const rollup = payload.statusCheckRollup ?? [];
+  if (rollup.length === 0) return "PENDING";
+  if (rollup.some((item) => item.state === "FAILURE")) return "FAILURE";
+  if (rollup.every((item) => item.state === "SUCCESS")) return "SUCCESS";
+  return "PENDING";
+}
+
 export type PrCheckState = GhCheckState | "unavailable";
-export type PrCheckStateResolver = (prUrl: string) => Promise<PrCheckState>;
+export type PrCheckStateResolver = (
+  prUrl: string,
+) => Promise<{ checkState: PrCheckState; snapshot: GhPrSnapshot | null }>;
+
+async function defaultResolveCheckState(
+  prUrl: string,
+): Promise<{ checkState: PrCheckState; snapshot: GhPrSnapshot | null }> {
+  const snapshot = await ghPrSnapshot(prUrl);
+  if (!snapshot) {
+    return { checkState: "unavailable", snapshot: null };
+  }
+  return { checkState: checkStateFromSnapshot(snapshot), snapshot };
+}
 
 export class PrPoller {
   constructor(
@@ -52,8 +71,61 @@ export class PrPoller {
     private readonly fleet: FleetService,
     private readonly readSeen: () => Promise<Record<string, string>>,
     private readonly writeSeen: (next: Record<string, string>) => Promise<void>,
-    private readonly resolveCheckState: PrCheckStateResolver = ghPrCheckState,
+    private readonly resolveCheckState: PrCheckStateResolver = defaultResolveCheckState,
   ) {}
+
+  private retirePollKeys(
+    seen: Record<string, string>,
+    nodeThreadId: string,
+    url: string,
+  ): void {
+    delete seen[`${nodeThreadId}:${url}`];
+    delete seen[`${nodeThreadId}:${url}:lifecycle`];
+  }
+
+  private async emitLifecycleChange(
+    homeId: string,
+    nodeThreadId: string,
+    url: string,
+    lifecycle: PrLifecycleState,
+    seen: Record<string, string>,
+  ): Promise<boolean> {
+    if (!lifecycle || lifecycle === "OPEN") return false;
+    const lifeKey = `${nodeThreadId}:${url}:lifecycle`;
+    const priorLife = seen[lifeKey];
+    if (lifecycle === priorLife) return false;
+
+    seen[lifeKey] = lifecycle;
+    const verb = lifecycleLedgerVerb(lifecycle);
+    if (verb) {
+      this.store.appendLedger({
+        homeId,
+        threadId: nodeThreadId,
+        verb,
+        fsmState: this.fleet.fsmForThread(nodeThreadId),
+        detail: { url, lifecycle },
+      });
+    }
+
+    const home = this.store.getHome(homeId);
+    const wakeReason = lifecycleWakeReason(lifecycle, url);
+    if (wakeReason && home) {
+      this.store.enqueueWake({
+        homeId,
+        threadId: nodeThreadId,
+        targetMateId: home.primaryMateId,
+        reason: wakeReason,
+        priority: lifecycle === "CHANGES_REQUESTED" ? 7 : 5,
+        dedupeKey: `${wakeReason}:${nodeThreadId}`,
+      });
+    }
+
+    if (shouldRetirePollAfterMerge(lifecycle)) {
+      this.retirePollKeys(seen, nodeThreadId, url);
+      return true;
+    }
+    return true;
+  }
 
   async pollHome(homeId: string): Promise<number> {
     const nodes = this.store.listNodes(homeId);
@@ -71,7 +143,27 @@ export class PrPoller {
       const url = String(prEntry.detail?.url);
       const key = `${node.threadId}:${url}`;
       const prior = seen[key];
-      const state = await this.resolveCheckState(url);
+
+      const { checkState: state, snapshot } = await this.resolveCheckState(url);
+      if (snapshot) {
+        const lifecycle = prStateFromSnapshot(snapshot);
+        if (
+          lifecycle &&
+          (await this.emitLifecycleChange(
+            homeId,
+            node.threadId,
+            url,
+            lifecycle,
+            seen,
+          ))
+        ) {
+          updates += 1;
+        }
+        if (lifecycle && shouldRetirePollAfterMerge(lifecycle)) {
+          continue;
+        }
+      }
+
       if (state === "unavailable" || state === prior) continue;
 
       seen[key] = state;

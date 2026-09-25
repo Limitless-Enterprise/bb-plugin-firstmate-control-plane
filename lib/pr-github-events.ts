@@ -48,3 +48,39 @@ export function parseGithubWebhookEvent(body: unknown): {
 export function webhookWakeReason(action: string, prUrl: string): string {
   return `webhook:${action}:${prUrl}`;
 }
+
+export function lifecycleWakeReason(
+  state: PrLifecycleState,
+  prUrl: string,
+): string | null {
+  switch (state) {
+    case "COMMITS_PUSHED":
+      return `pr.commits:${prUrl}`;
+    case "REVIEW_REQUESTED":
+      return `pr.review:${prUrl}`;
+    case "CHANGES_REQUESTED":
+      return `pr.changes:${prUrl}`;
+    case "MERGED":
+    case "CLOSED":
+      return `pr.merged:${prUrl}`;
+    default:
+      return null;
+  }
+}
+
+export function lifecycleLedgerVerb(state: PrLifecycleState): string | null {
+  switch (state) {
+    case "COMMITS_PUSHED":
+      return "pr.commits.pushed";
+    case "REVIEW_REQUESTED":
+      return "pr.review.requested";
+    case "CHANGES_REQUESTED":
+      return "pr.changes.requested";
+    case "MERGED":
+      return "pr.merged";
+    case "CLOSED":
+      return "pr.closed";
+    default:
+      return null;
+  }
+}

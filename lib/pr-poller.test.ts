@@ -31,7 +31,10 @@ const CREW: FleetNode = {
 const PR_URL = "https://github.com/org/repo/pull/9";
 
 function pollerHarness(
-  resolveCheckState: (url: string) => Promise<"SUCCESS" | "FAILURE" | "PENDING" | "unavailable">,
+  resolveCheckState: (
+    url: string,
+  ) => Promise<"SUCCESS" | "FAILURE" | "PENDING" | "unavailable">,
+  snapshot: Record<string, unknown> = { state: "OPEN" },
 ) {
   const ledger: { verb: string; threadId: string; detail?: Record<string, unknown> }[] =
     [];
@@ -97,7 +100,10 @@ function pollerHarness(
     async (next) => {
       seen = next;
     },
-    resolveCheckState,
+    async (url) => ({
+      checkState: await resolveCheckState(url),
+      snapshot,
+    }),
   );
 
   ledger.push({

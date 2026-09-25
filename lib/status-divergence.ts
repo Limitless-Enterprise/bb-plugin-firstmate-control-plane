@@ -68,3 +68,36 @@ export function formatDivergenceRecord(entry: DivergenceCase): string {
 }
 
 export const DIVERGENCE_LEDGER_VERB = "ledger.divergence";
+
+export function decisionKeyForOpenHold(
+  hold: { threadId: string; title: string; body: string },
+  registry: { threadId: string; key: string }[],
+): string | null {
+  const titleToken = hold.title.trim().split(/\s+/)[0];
+  if (titleToken) {
+    const registered = registry.some(
+      (entry) => entry.threadId === hold.threadId && entry.key === titleToken,
+    );
+    if (registered || hold.title.includes(titleToken)) {
+      return titleToken;
+    }
+  }
+  for (const entry of registry) {
+    if (entry.threadId !== hold.threadId) continue;
+    if (hold.title.includes(entry.key) || hold.body.includes(entry.key)) {
+      return entry.key;
+    }
+  }
+  return titleToken || null;
+}
+
+export function mapOpenHoldsForDivergence(
+  holds: { threadId: string; title: string; body: string }[],
+  registry: { threadId: string; key: string }[],
+): { threadId: string; title: string; decisionKey: string | null }[] {
+  return holds.map((hold) => ({
+    threadId: hold.threadId,
+    title: hold.title,
+    decisionKey: decisionKeyForOpenHold(hold, registry),
+  }));
+}

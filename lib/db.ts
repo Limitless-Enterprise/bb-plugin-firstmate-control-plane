@@ -907,6 +907,34 @@ export class FleetStore {
     };
   }
 
+  listRecordedDecisions(homeId: string): { threadId: string; key: string }[] {
+    const kvKey = `decisions:${homeId}`;
+    const row = this.db.prepare("SELECT value FROM kv WHERE key = ?").get(kvKey) as
+      | { value: string }
+      | undefined;
+    if (!row) return [];
+    const list = JSON.parse(row.value) as unknown[];
+    const out: { threadId: string; key: string }[] = [];
+    for (const item of list) {
+      if (!item || typeof item !== "object") continue;
+      const entry = item as { threadId?: string; key?: string };
+      if (typeof entry.threadId === "string" && typeof entry.key === "string") {
+        out.push({ threadId: entry.threadId, key: entry.key });
+      }
+    }
+    return out;
+  }
+
+  countLedgerVerbSince(homeId: string, verb: string, sinceMs: number): number {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS c FROM ledger
+         WHERE home_id = ? AND verb = ? AND created_at_ms >= ?`,
+      )
+      .get(homeId, verb, sinceMs) as { c: number };
+    return row.c;
+  }
+
   recordDecision(input: {
     homeId: string;
     threadId: string;
@@ -1008,6 +1036,12 @@ export class FleetStore {
         "UPDATE steer_queue SET state = 'sent', sent_at_ms = ? WHERE id = ?",
       )
       .run(Date.now(), id);
+  }
+
+  markSteerFailed(id: string): void {
+    this.db
+      .prepare("UPDATE steer_queue SET state = 'failed' WHERE id = ?")
+      .run(id);
   }
 
   incrementSteerAttempt(id: string): number {

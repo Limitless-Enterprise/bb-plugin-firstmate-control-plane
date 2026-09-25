@@ -13,6 +13,7 @@ import {
   detectStatusBacklogDivergence,
   DIVERGENCE_LEDGER_VERB,
   formatDivergenceRecord,
+  mapOpenHoldsForDivergence,
 } from "./status-divergence";
 import {
   isProgressOnlyStatusLine,
@@ -212,11 +213,10 @@ export class StatusBridge {
             });
           }
         }
-        const openHolds = this.store.listHolds(homeId, "open").map((hold) => ({
-          threadId: hold.threadId,
-          title: hold.title,
-          decisionKey: null as string | null,
-        }));
+        const openHolds = mapOpenHoldsForDivergence(
+          this.store.listHolds(homeId, "open"),
+          this.store.listRecordedDecisions(homeId),
+        );
         const divergence = detectStatusBacklogDivergence({
           threadId,
           taskId,
@@ -286,11 +286,10 @@ export class StatusBridge {
       }
 
       if (parsed.prefix === "resolved:" && parsed.decisionKey) {
-        const openHolds = this.store.listHolds(homeId, "open").map((hold) => ({
-          threadId: hold.threadId,
-          title: hold.title,
-          decisionKey: hold.title.split(/\s+/)[0] ?? null,
-        }));
+        const openHolds = mapOpenHoldsForDivergence(
+          this.store.listHolds(homeId, "open"),
+          this.store.listRecordedDecisions(homeId),
+        );
         const divergence = detectStatusBacklogDivergence({
           threadId,
           taskId,

@@ -21,8 +21,20 @@ import {
   awayPostureKvKey,
   buildReturnBrief,
   checkKindWakeReason,
+  instructionRefreshReason,
+  nextWedgeEscalationCount,
+  pauseResurfaceDueMs,
+  pauseResurfaceWakeReason,
+  recoveryEpisodeId,
+  recoveryWakeReason,
+  shouldDeferStaleIdleForWorktreeMtime,
+  shouldEscalateWedge,
   startupInactiveScanReason,
+  supervisorDeadAlarmDue,
+  wedgeWakeReason,
 } from "./lib/supervisor-policy";
+import { DIVERGENCE_LEDGER_VERB } from "./lib/status-divergence";
+import { PROGRESS_LEDGER_VERB } from "./lib/status-progress";
 import { parseBatchSpawnJson } from "./lib/fleet-batch-spawn";
 import { filterInboxItems } from "./lib/fleet-inbox-filters";
 import { parseGithubWebhookEvent } from "./lib/pr-github-events";
@@ -114,6 +126,11 @@ export default async function plugin(bb: BbPluginApi) {
       type: "string",
       label: "Max concurrent active crews per home (dispatch wait)",
       default: String(DEFAULT_MAX_CREW_CONCURRENCY),
+    },
+    githubWebhookSecret: {
+      type: "string",
+      label: "GitHub webhook shared secret (X-Fleet-Webhook-Secret header)",
+      default: "",
     },
   });
 
@@ -487,6 +504,28 @@ export default async function plugin(bb: BbPluginApi) {
         };
         await refreshSupervisorLock();
         await applyRuntimeLimits();
+        const priorBeaconMs =
+          (await bb.storage.kv.get<number>("fleet.supervisor.beaconMs")) ?? 0;
+        if (
+          priorBeaconMs > 0 &&
+          supervisorDeadAlarmDue({
+            lockExpiresMs: lock?.expiresMs ?? 0,
+            lastBeaconMs: priorBeaconMs,
+            nowMs: now,
+            graceMs: config.probeIntervalMs * 3,
+          })
+        ) {
+          for (const home of store.listHomes()) {
+            store.enqueueWake({
+              homeId: home.homeId,
+              threadId: home.mateThreadId,
+              targetMateId: home.primaryMateId,
+              reason: `supervisor.dead:${home.homeId}`,
+              priority: 10,
+              dedupeKey: `supervisor.dead:${home.homeId}`,
+            });
+          }
+        }
         await bb.storage.kv.set("fleet.supervisor.beaconMs", Date.now());
         const startupDone = await bb.storage.kv.get<boolean>(
           "fleet.supervisor.startupScan",
@@ -550,13 +589,70 @@ export default async function plugin(bb: BbPluginApi) {
                   ),
                 })
               ) {
+                const episodeId = recoveryEpisodeId(node.threadId);
                 store.enqueueWake({
                   homeId: home.homeId,
                   threadId: home.mateThreadId,
                   targetMateId: home.primaryMateId,
-                  reason: `liveness.${verdict}:${node.threadId}`,
+                  reason: recoveryWakeReason(episodeId),
                   priority: 9,
                   dedupeKey: livenessWakeDedupeKey(node.threadId),
+                });
+              }
+            }
+            const awayPosture =
+              (await bb.storage.kv.get<boolean>(awayPostureKvKey(home.homeId))) ===
+              true;
+            const lastPaused = store.latestLedgerByVerbs(node.threadId, [
+              "crew.paused",
+            ]);
+            const pauseCadenceSec = Math.max(
+              60,
+              Math.floor(config.staleIdleSec / 3),
+            );
+            if (
+              lastPaused &&
+              pauseResurfaceDueMs(
+                lastPaused.createdAtMs,
+                pauseCadenceSec,
+                Date.now(),
+              )
+            ) {
+              const resurfaceReason = pauseResurfaceWakeReason(node.threadId);
+              if (shouldEnqueueMateWake(resurfaceReason, awayPosture)) {
+                store.enqueueWake({
+                  homeId: home.homeId,
+                  threadId: home.mateThreadId,
+                  targetMateId: home.primaryMateId,
+                  reason: resurfaceReason,
+                  priority: 4,
+                  dedupeKey: resurfaceReason,
+                });
+              }
+            }
+            const recentProgress = store
+              .tailLedger(node.threadId, 8)
+              .find((entry) => entry.verb === PROGRESS_LEDGER_VERB);
+            const progressDetail = recentProgress?.detail
+              ? JSON.stringify(recentProgress.detail)
+              : "";
+            if (progressDetail.toLowerCase().includes("compact")) {
+              const refreshReason = instructionRefreshReason(node.threadId);
+              if (shouldEnqueueMateWake(refreshReason, awayPosture)) {
+                store.enqueueWake({
+                  homeId: home.homeId,
+                  threadId: home.mateThreadId,
+                  targetMateId: home.primaryMateId,
+                  reason: refreshReason,
+                  priority: 2,
+                  dedupeKey: refreshReason,
+                });
+                store.appendLedger({
+                  homeId: home.homeId,
+                  threadId: node.threadId,
+                  verb: "instruction.refresh",
+                  fsmState: fsm,
+                  detail: { signal: "compact" },
                 });
               }
             }
@@ -591,21 +687,53 @@ export default async function plugin(bb: BbPluginApi) {
                 last &&
                 Date.now() - last.createdAtMs > config.staleIdleSec * 1000
               ) {
-                const away = await bb.storage.kv.get<boolean>(
-                  awayPostureKvKey(home.homeId),
-                );
-                const reason = `stale-idle:${node.threadId}`;
-                if (shouldEnqueueMateWake(reason, away === true)) {
-                  store.enqueueWake({
-                    homeId: home.homeId,
-                    threadId: home.mateThreadId,
-                    targetMateId: home.primaryMateId,
-                    reason,
-                    priority: 3,
-                    dedupeKey: `stale-idle:${node.threadId}`,
-                  });
+                let worktreeMtimeMs = 0;
+                if (node.envId) {
+                  try {
+                    const env = await bb.sdk.environments.get({
+                      environmentId: node.envId,
+                    });
+                    const worktreePath = env.path?.trim();
+                    if (worktreePath) {
+                      const stat = await fs.stat(worktreePath);
+                      worktreeMtimeMs = stat.mtimeMs;
+                    }
+                  } catch {
+                    worktreeMtimeMs = 0;
+                  }
+                }
+                const deferStale = shouldDeferStaleIdleForWorktreeMtime({
+                  lastStatusMs: last.createdAtMs,
+                  worktreeMtimeMs,
+                  quietSec: 120,
+                });
+                if (!deferStale) {
+                  const wedgeKey = `fleet.wedge.${node.threadId}`;
+                  const wedgeCount =
+                    (await bb.storage.kv.get<number>(wedgeKey)) ?? 0;
+                  const nextWedge = nextWedgeEscalationCount(wedgeCount);
+                  await bb.storage.kv.set(wedgeKey, nextWedge);
+                  const escalated = shouldEscalateWedge(nextWedge);
+                  const reason = escalated
+                    ? wedgeWakeReason(node.threadId)
+                    : `stale-idle:${node.threadId}`;
+                  const dedupeKey = escalated
+                    ? `wedge:${node.threadId}`
+                    : `stale-idle:${node.threadId}`;
+                  if (shouldEnqueueMateWake(reason, awayPosture)) {
+                    store.enqueueWake({
+                      homeId: home.homeId,
+                      threadId: home.mateThreadId,
+                      targetMateId: home.primaryMateId,
+                      reason,
+                      priority: escalated ? 5 : 3,
+                      dedupeKey,
+                    });
+                  }
                 }
               }
+            } else {
+              await bb.storage.kv.set(`fleet.wedge.${node.threadId}`, 0);
             }
           }
           await fleet.processSteerQueues(home.homeId);
@@ -627,10 +755,24 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
+  const initialWebhookSettings = await settings.get();
+  const githubWebhookAuth =
+    initialWebhookSettings.githubWebhookSecret.trim().length > 0
+      ? "none"
+      : "token";
+
   bb.http.route(
     "POST",
     "/github/webhook",
     async (c) => {
+      const webhookSettings = await settings.get();
+      const webhookSecret = webhookSettings.githubWebhookSecret.trim();
+      if (webhookSecret) {
+        const headerSecret = c.req.header("X-Fleet-Webhook-Secret");
+        if (headerSecret !== webhookSecret) {
+          return c.json({ ok: false, error: "unauthorized" }, 401);
+        }
+      }
       let body: unknown = null;
       try {
         body = await c.req.json();
@@ -654,7 +796,7 @@ export default async function plugin(bb: BbPluginApi) {
       fleet.publish();
       return c.json({ ok: true });
     },
-    { auth: "none" },
+    { auth: githubWebhookAuth },
   );
 
   const usage = [
@@ -1093,7 +1235,11 @@ export default async function plugin(bb: BbPluginApi) {
                 nowMs: Date.now(),
                 inboxOpened: store.countOpenInbox(id),
                 wakesUnacked: store.countUnackedWakes(id),
-                divergences: 0,
+                divergences: store.countLedgerVerbSince(
+                  id,
+                  DIVERGENCE_LEDGER_VERB,
+                  since,
+                ),
               });
               return reply({ brief }, brief);
             }

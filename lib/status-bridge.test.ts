@@ -74,6 +74,12 @@ function bridgeHarness(options: {
     recordDecision(input: { key: string; threadId: string }) {
       decisions.push({ key: input.key, threadId: input.threadId });
     },
+    listRecordedDecisions() {
+      return decisions.map((entry) => ({
+        threadId: entry.threadId,
+        key: entry.key,
+      }));
+    },
     enqueueWake(input: {
       reason: string;
       threadId: string;

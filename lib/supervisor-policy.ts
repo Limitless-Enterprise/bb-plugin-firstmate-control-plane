@@ -8,6 +8,10 @@ export function pauseResurfaceDueMs(
   return nowMs - pausedAtMs >= cadenceSec * 1000;
 }
 
+export function pauseResurfaceWakeReason(threadId: string): string {
+  return `paused:resurface:${threadId}`;
+}
+
 export function nextWedgeEscalationCount(priorCount: number): number {
   return priorCount + 1;
 }
