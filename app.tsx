@@ -173,10 +173,12 @@ function InboxList({
   onOpen: (threadId: string) => void;
   onResolve: (id: string) => void;
   onSnooze: (id: string, untilMs: number) => void;
-  onReply: (threadId: string, steerText: string) => void;
+  onReply: (threadId: string, steerText: string) => void | Promise<void>;
 }) {
   const [replyItemId, setReplyItemId] = useState<string | null>(null);
   const [replyComment, setReplyComment] = useState("");
+  const [replyBusy, setReplyBusy] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
 
   if (items.length === 0) {
     return (
@@ -207,6 +209,7 @@ function InboxList({
                 onClick={() => {
                   setReplyItemId(item.id);
                   setReplyComment("");
+                  setReplyError(null);
                 }}
               >
                 Reply
@@ -236,9 +239,21 @@ function InboxList({
                   comment: replyComment,
                 });
                 if (!steerText) return;
-                onReply(item.threadId, steerText);
-                setReplyItemId(null);
-                setReplyComment("");
+                void (async () => {
+                  setReplyBusy(true);
+                  setReplyError(null);
+                  try {
+                    await onReply(item.threadId, steerText);
+                    setReplyItemId(null);
+                    setReplyComment("");
+                  } catch (cause: unknown) {
+                    setReplyError(
+                      cause instanceof Error ? cause.message : String(cause),
+                    );
+                  } finally {
+                    setReplyBusy(false);
+                  }
+                })();
               }}
             >
               <label className="text-xs font-medium text-muted-foreground">
@@ -249,19 +264,31 @@ function InboxList({
                 placeholder="What should the crew do?"
                 value={replyComment}
                 onChange={(event) => setReplyComment(event.target.value)}
+                disabled={replyBusy}
                 autoFocus
               />
+              {replyError ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {replyError}
+                </p>
+              ) : null}
               <div className="flex gap-2">
-                <Button type="submit" size="sm" disabled={!replyComment.trim()}>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={replyBusy || !replyComment.trim()}
+                >
                   Send steer
                 </Button>
                 <Button
                   type="button"
                   size="sm"
                   variant="ghost"
+                  disabled={replyBusy}
                   onClick={() => {
                     setReplyItemId(null);
                     setReplyComment("");
+                    setReplyError(null);
                   }}
                 >
                   Cancel
@@ -624,16 +651,15 @@ function FleetPage({ subPath }: { subPath?: string }) {
                 .call("snoozeInbox", { homeId: selectedHomeId, id, untilMs })
                 .then(() => refetchHome(selectedHomeId));
             }}
-            onReply={(threadId, steerText) => {
+            onReply={async (threadId, steerText) => {
               const payload = fleetSteerPayload(
                 selectedHomeId,
                 threadId,
                 steerText,
               );
               if (!payload) return;
-              rpc
-                .call("steer", payload)
-                .then(() => refetchHome(selectedHomeId));
+              await rpc.call("steer", payload);
+              refetchHome(selectedHomeId);
             }}
           />
         </div>
