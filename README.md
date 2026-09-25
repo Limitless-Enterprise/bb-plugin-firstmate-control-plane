@@ -33,8 +33,9 @@ bb fleet integration check --mate cto
 ## Panel
 
 Open **Fleet** in the BB sidebar (`/plugins/firstmate-control-plane/fleet`): home
-switcher, tree + ThreadChat (mobile tree toggle), Inbox, status board, and crew
-overflow controls (interrupt, exit, relaunch, detach). Deep links:
+switcher, tree + ThreadChat (mobile tree toggle), Inbox (resolve, snooze, **Reply** composer — required steer comment; title/body
+are context only), status board, and crew overflow controls (interrupt, exit,
+relaunch, detach). Deep links:
 `/fleet/inbox`, `/fleet/board`, `/fleet/homes`, `/fleet/thread/<threadId>`.
 
 ## Implementation plan

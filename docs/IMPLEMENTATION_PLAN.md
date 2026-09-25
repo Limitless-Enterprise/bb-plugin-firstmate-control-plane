@@ -114,7 +114,8 @@ bb-plugin-firstmate-control-plane/
 - Full Inbox tab, badges, deep links, CLI
 - Teardown guard while holds open
 
-**Exit:** Hold → Inbox → resolve clears rail + badge.
+**Exit:** Hold → Inbox → resolve clears rail + badge; Reply steers the crew thread
+with an operator comment (inbox title/body as context only).
 
 ### Phase 6 — Supervisor timers + watch integration
 

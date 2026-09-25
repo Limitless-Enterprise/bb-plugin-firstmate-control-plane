@@ -19,6 +19,12 @@ The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it 
 |----|------------|--------|
 | P-SYNC-1 | BB ↔ Fleet close-out (`thread.archived` → registry; `detachCrew` → BB archive) | unit: `fleet-archive-sync.test.ts` (resolve holds; clear inbox incl. snoozed; ack crew- and mate-targeted wakes; detach archives before `deleteNode`, fail-closed on archive error); live: archive child thread → node removed; detach → thread archived (not deleted) |
 
+## Inbox (P-H10)
+
+| ID | Capability | Verify |
+|----|------------|--------|
+| P-H10 | Snooze / resolve / reply | unit: `inbox-snooze.test.ts` (expired snooze resurface; resolve clears open counts); `fleet-ui.test.ts` `inboxReplySteerText` (non-empty comment required; Subject/Context/Reply sections); doc: [contracts/README.md](../contracts/README.md#fleet-inbox-item) (Reply composer → `steer` RPC) |
+
 ## Inventory traceability
 
 Every **B-*** and **P-*** row in `CAPABILITY_INVENTORY.md` with **M1 ✓** must be **✅** in the inventory table before M1 is complete. **`🔲` not-done rows are expected** until those capabilities ship; `./scripts/m1-inventory-gate.sh` fails on any **M1 ✓** **🔲** or **⚠** row. Run it before merge to `main`.

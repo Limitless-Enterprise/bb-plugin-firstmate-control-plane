@@ -160,6 +160,14 @@ Resolving the last open hold on a thread appends `mark.idle` and clears blocked 
 }
 ```
 
+**Fleet panel Inbox (P-H10):** **Resolve** and **Snooze** call `resolveInbox` /
+`snoozeInbox` RPCs. **Reply** opens an inline composer; the operator must enter a
+non-empty steer comment (title and body are not sent alone). Submit builds steer
+text via `lib/fleet-ui.ts` `inboxReplySteerText` (`Subject:` / `Context:` from the
+item, then `Reply:` with the comment) and calls the `steer` RPC for the item’s
+`threadId`. Empty or whitespace-only comments do not steer. Per-item drafts persist
+while switching rows; the composer stays open until steer succeeds or shows an error.
+
 ## Delivery modes + yolo
 
 - `deliveryMode`: orthogonal to `yolo: boolean`.
