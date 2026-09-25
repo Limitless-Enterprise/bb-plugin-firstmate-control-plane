@@ -6,6 +6,7 @@ import {
   fleetOverflowRpcCall,
   fleetPanelFromSubPath,
   fleetSteerPayload,
+  inboxReplySteerText,
   mobileTreeDrawerHidden,
   needsDecisionRailLine,
 } from "./fleet-ui";
@@ -72,6 +73,20 @@ describe("mobileTreeDrawerHidden (P-U8)", () => {
   it("hides drawer on small screens when closed", () => {
     assert.equal(mobileTreeDrawerHidden(false), "max-md:hidden");
     assert.equal(mobileTreeDrawerHidden(true), "");
+  });
+});
+
+describe("inboxReplySteerText (P-H10 reply)", () => {
+  it("requires operator comment and includes inbox context", () => {
+    assert.equal(inboxReplySteerText({ title: "blocked", body: "waiting", comment: "  " }), null);
+    const text = inboxReplySteerText({
+      title: "API down",
+      body: "crew stalled on deploy",
+      comment: "Try rollback and ping me.",
+    });
+    assert.ok(text?.includes("Subject: API down"));
+    assert.ok(text?.includes("crew stalled on deploy"));
+    assert.ok(text?.includes("Try rollback and ping me."));
   });
 });
 

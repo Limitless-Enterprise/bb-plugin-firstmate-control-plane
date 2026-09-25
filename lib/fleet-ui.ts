@@ -61,3 +61,20 @@ export function fleetOverflowRpcCall(
 ): { method: FleetOverflowAction; params: { homeId: string; threadId: string } } {
   return { method: action, params: { homeId, threadId } };
 }
+
+/** P-H10: operator reply includes inbox context plus their steer comment. */
+export function inboxReplySteerText(input: {
+  title: string;
+  body: string;
+  comment: string;
+}): string | null {
+  const comment = input.comment.trim();
+  if (!comment) return null;
+  const title = input.title.trim();
+  const body = input.body.trim();
+  const lines = ["Re: Fleet inbox"];
+  if (title) lines.push(`Subject: ${title}`);
+  if (body) lines.push("", "Context:", body);
+  lines.push("", "Reply:", comment);
+  return lines.join("\n");
+}

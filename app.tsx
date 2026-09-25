@@ -19,6 +19,7 @@ import {
   fleetOverflowRpcCall,
   fleetPanelFromSubPath,
   fleetSteerPayload,
+  inboxReplySteerText,
   mobileTreeDrawerHidden,
   needsDecisionRailLine,
 } from "./lib/fleet-ui";
@@ -172,8 +173,11 @@ function InboxList({
   onOpen: (threadId: string) => void;
   onResolve: (id: string) => void;
   onSnooze: (id: string, untilMs: number) => void;
-  onReply: (threadId: string, text: string) => void;
+  onReply: (threadId: string, steerText: string) => void;
 }) {
+  const [replyItemId, setReplyItemId] = useState<string | null>(null);
+  const [replyComment, setReplyComment] = useState("");
+
   if (items.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
@@ -184,38 +188,87 @@ function InboxList({
   return (
     <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
       {items.map((item) => (
-        <li key={item.id} className="flex items-start gap-3 px-3 py-3 text-sm">
-          <div className="min-w-0 flex-1">
-            <div className="font-medium">{item.title}</div>
-            <div className="mt-0.5 text-muted-foreground">{item.body}</div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              {item.kind} · {item.urgency}
+        <li key={item.id} className="px-3 py-3 text-sm">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">{item.title}</div>
+              <div className="mt-0.5 text-muted-foreground">{item.body}</div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {item.kind} · {item.urgency}
+              </div>
+            </div>
+            <div className="flex shrink-0 gap-1">
+              <Button size="sm" variant="outline" onClick={() => onOpen(item.threadId)}>
+                Open
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setReplyItemId(item.id);
+                  setReplyComment("");
+                }}
+              >
+                Reply
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => onResolve(item.id)}>
+                Resolve
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  onSnooze(item.id, Date.now() + 3600_000)
+                }
+              >
+                Snooze 1h
+              </Button>
             </div>
           </div>
-          <div className="flex shrink-0 gap-1">
-            <Button size="sm" variant="outline" onClick={() => onOpen(item.threadId)}>
-              Open
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onReply(item.threadId, item.body)}
+          {replyItemId === item.id ? (
+            <form
+              className="mt-3 flex flex-col gap-2 border-t border-border pt-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const steerText = inboxReplySteerText({
+                  title: item.title,
+                  body: item.body,
+                  comment: replyComment,
+                });
+                if (!steerText) return;
+                onReply(item.threadId, steerText);
+                setReplyItemId(null);
+                setReplyComment("");
+              }}
             >
-              Reply
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => onResolve(item.id)}>
-              Resolve
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() =>
-                onSnooze(item.id, Date.now() + 3600_000)
-              }
-            >
-              Snooze 1h
-            </Button>
-          </div>
+              <label className="text-xs font-medium text-muted-foreground">
+                Add your steer (inbox context is included automatically)
+              </label>
+              <textarea
+                className="min-h-[80px] w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                placeholder="What should the crew do?"
+                value={replyComment}
+                onChange={(event) => setReplyComment(event.target.value)}
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <Button type="submit" size="sm" disabled={!replyComment.trim()}>
+                  Send steer
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setReplyItemId(null);
+                    setReplyComment("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          ) : null}
         </li>
       ))}
     </ul>
@@ -571,9 +624,15 @@ function FleetPage({ subPath }: { subPath?: string }) {
                 .call("snoozeInbox", { homeId: selectedHomeId, id, untilMs })
                 .then(() => refetchHome(selectedHomeId));
             }}
-            onReply={(threadId, text) => {
+            onReply={(threadId, steerText) => {
+              const payload = fleetSteerPayload(
+                selectedHomeId,
+                threadId,
+                steerText,
+              );
+              if (!payload) return;
               rpc
-                .call("steer", { homeId: selectedHomeId, threadId, text })
+                .call("steer", payload)
                 .then(() => refetchHome(selectedHomeId));
             }}
           />
