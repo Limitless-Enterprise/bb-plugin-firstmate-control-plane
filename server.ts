@@ -655,7 +655,7 @@ export default async function plugin(bb: BbPluginApi) {
               if (compactProgress.createdAtMs > handledCompactMs) {
                 const refreshReason = instructionRefreshReason(node.threadId);
                 if (shouldEnqueueMateWake(refreshReason, awayPosture)) {
-                  store.enqueueWake({
+                  const refreshWakeId = store.enqueueWake({
                     homeId: home.homeId,
                     threadId: home.mateThreadId,
                     targetMateId: home.primaryMateId,
@@ -663,17 +663,19 @@ export default async function plugin(bb: BbPluginApi) {
                     priority: 2,
                     dedupeKey: refreshReason,
                   });
-                  store.appendLedger({
-                    homeId: home.homeId,
-                    threadId: node.threadId,
-                    verb: "instruction.refresh",
-                    fsmState: fsm,
-                    detail: { signal: "compact" },
-                  });
-                  await bb.storage.kv.set(
-                    refreshCursorKey,
-                    compactProgress.createdAtMs,
-                  );
+                  if (refreshWakeId) {
+                    store.appendLedger({
+                      homeId: home.homeId,
+                      threadId: node.threadId,
+                      verb: "instruction.refresh",
+                      fsmState: fsm,
+                      detail: { signal: "compact" },
+                    });
+                    await bb.storage.kv.set(
+                      refreshCursorKey,
+                      compactProgress.createdAtMs,
+                    );
+                  }
                 }
               }
             }
@@ -825,7 +827,7 @@ export default async function plugin(bb: BbPluginApi) {
           targetMateId: home.primaryMateId,
           reason: `webhook:${parsed.action}:${parsed.prUrl}`,
           priority: 6,
-          dedupeKey: `webhook:${parsed.action}:${parsed.prUrl}`,
+          dedupeKey: `webhook:${home.homeId}:${parsed.action}:${parsed.prUrl}`,
         });
       }
       fleet.publish();

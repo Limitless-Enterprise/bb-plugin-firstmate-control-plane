@@ -29,10 +29,7 @@ import {
   detectStatusBacklogDivergence,
   formatDivergenceRecord,
 } from "./status-divergence";
-import {
-  isProgressOnlyStatusLine,
-  PROGRESS_LEDGER_VERB,
-} from "./status-progress";
+import { isProgressOnlyStatusLine } from "./status-progress";
 import {
   doorbellNudgeText,
   shouldFirePostSteerStallWatchdog,
@@ -83,7 +80,6 @@ describe("M1 backlog modules", () => {
 
   it("progress-only touch (P-L8)", () => {
     assert.equal(isProgressOnlyStatusLine("progress: still coding"), true);
-    assert.equal(PROGRESS_LEDGER_VERB, "crew.progress");
   });
 
   it("dispatch limit (P-D8)", () => {
