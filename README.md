@@ -16,6 +16,7 @@ bb plugin install .
 bb fleet home bootstrap cto --label CTO --parent /workspace/Codes
 bb fleet home create cto --label CTO --parent /workspace/Codes --thread <mateThreadId>
 bb fleet spawn --mate cto --role ship --label auth --prompt "Ship the auth fix"
+bb fleet spawn --mate cto --batch-file ./crews.json   # JSON array: label, role, prompt, optional profileId/mode/yolo
 bb fleet tree --mate cto
 bb fleet board --mate cto
 bb fleet inbox --mate cto [--limit 100]
@@ -33,7 +34,8 @@ bb fleet integration check --mate cto
 ## Panel
 
 Open **Fleet** in the BB sidebar (`/plugins/firstmate-control-plane/fleet`): home
-switcher, tree + ThreadChat (mobile tree toggle), Inbox (resolve, snooze, **Reply** composer — required steer comment; title/body
+switcher, tree + ThreadChat (mobile tree toggle), spawn profile picker, Inbox (kind
+filters; resolve, snooze, **Reply** composer — required steer comment; title/body
 are context only), status board, and crew overflow controls (interrupt, exit,
 relaunch, detach). Deep links:
 `/fleet/inbox`, `/fleet/board`, `/fleet/homes`, `/fleet/thread/<threadId>`.

@@ -9,7 +9,7 @@ The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it 
 | Kind | Meaning |
 |------|---------|
 | **live** | `scripts/m1-ac-full.sh` or `m1-ac-live-*` against `tech` mate |
-| **unit** | `pnpm test` (`lib/*.test.ts` for promoted **M1 ✓** capabilities; `scripts/bb-backend-m1-contract.sh` for overlay B-O8/B-O9/B-O10 fail-closed, B-W4 validate_spawn, B-O1/B-O5/B-O7 with stub `bb`; `scripts/spawn-wrap-m1-contract.sh` for native spawn wraps). Batch 5 closed all **M1 ✓** **⚠** rows (zero partials); gate still exits 1 while **M1 ✓** **🔲** rows remain |
+| **unit** | `pnpm test` (`lib/*.test.ts` for promoted **M1 ✓** capabilities; `scripts/bb-backend-m1-contract.sh` for overlay B-O8–B-O11 fail-closed, B-W4 validate_spawn, B-O1/B-O5/B-O7 with stub `bb`; `scripts/spawn-wrap-m1-contract.sh` for native spawn wraps). Batch 6 closed all remaining **M1 ✓** **🔲** rows; gate passes when every **M1 ✓** row is **✅** |
 | **lint** | `pnpm run typecheck` + repo linters |
 | **doc** | File present and matches behavior |
 

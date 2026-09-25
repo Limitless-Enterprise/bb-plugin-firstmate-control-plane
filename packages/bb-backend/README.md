@@ -38,5 +38,5 @@ Replace the v1 `integration/bin/fm-spawn.sh` stub with:
    teardown
 
 See `docs/IMPLEMENTATION_PLAN.md` Phase 1. M1 overlay fail-closed checks
-(B-O8/B-O9/B-O10) run via `scripts/bb-backend-m1-contract.sh` as part of
-`pnpm test`.
+(B-O8–B-O11, B-W4, B-O1/B-O5/B-O7) run via `scripts/bb-backend-m1-contract.sh` as
+part of `pnpm test`.

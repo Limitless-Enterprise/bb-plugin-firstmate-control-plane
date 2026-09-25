@@ -228,7 +228,15 @@ registry and environment checkout paths (`lib/mate-checkout-paths.ts`), scans ea
 `state/<id>.status` for `working:`, `done:`, `failed:`,
 `blocked:`, `paused:`, `needs-decision:`, `resolved:`, and `note:` (`note:` appends
 `crew.note` ledger entries; other prefixes map per `lib/status-verbs.ts`).
-PR poller watches GitHub checks.
+PR poller watches GitHub checks and PR lifecycle (review, commits, merge retire).
+
+**GitHub webhook (P-P7):** `POST /github/webhook` on the plugin HTTP server.
+Configure `githubWebhookSecret` in Fleet settings. When non-empty, requests must
+include matching `X-Fleet-Webhook-Secret`; when empty, BB plugin token auth applies
+(route auth is `none`; handler enforces one of these). Valid GitHub PR event JSON
+(`pull_request.html_url`) enqueues mate wakes only for homes that have a crew whose
+ledger includes a matching `pr.opened` URL. Dedupe keys are home-scoped
+(`webhook:<homeId>:<action>:<prUrl>`).
 
 Pure CLI use: set `enabled: false` or use a checkout without the overlay.
 
@@ -242,6 +250,8 @@ See `packages/bb-backend/overlay/README.md` for the installed file tree.
 | `statusBridgeIntervalSec` | 3 | 2 |
 | `busyAgeSec` | 900 | 60 |
 | `staleIdleSec` | 1800 | 60 |
+| `maxCrewConcurrency` | 6 | 1 |
+| `githubWebhookSecret` | (empty) | — |
 | `autoRespawn` | false | — |
 
 Status bridge scans `state/*.status` on every resolved mate checkout path on this
