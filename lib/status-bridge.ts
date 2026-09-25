@@ -226,14 +226,7 @@ export class StatusBridge {
         });
         if (divergence && home) {
           const record = formatDivergenceRecord(divergence);
-          this.store.appendLedger({
-            homeId,
-            threadId,
-            verb: DIVERGENCE_LEDGER_VERB,
-            fsmState: this.fleet.fsmForThread(threadId),
-            detail: { record, ...divergence },
-          });
-          this.store.enqueueWake({
+          const divergenceWakeId = this.store.enqueueWake({
             homeId,
             threadId: home.mateThreadId,
             targetMateId: home.primaryMateId,
@@ -241,14 +234,23 @@ export class StatusBridge {
             priority: 8,
             dedupeKey: `divergence:${threadId}:${divergence.kind}`,
           });
-          this.store.createInboxItem({
-            homeId,
-            threadId,
-            kind: "wake",
-            urgency: "high",
-            title: "Status vs backlog divergence",
-            body: record,
-          });
+          if (divergenceWakeId) {
+            this.store.appendLedger({
+              homeId,
+              threadId,
+              verb: DIVERGENCE_LEDGER_VERB,
+              fsmState: this.fleet.fsmForThread(threadId),
+              detail: { record, ...divergence },
+            });
+            this.store.createInboxItem({
+              homeId,
+              threadId,
+              kind: "wake",
+              urgency: "high",
+              title: "Status vs backlog divergence",
+              body: record,
+            });
+          }
         }
         const captainHolds = this.store
           .listHolds(homeId, "open")
@@ -300,14 +302,7 @@ export class StatusBridge {
         });
         if (divergence && home) {
           const record = formatDivergenceRecord(divergence);
-          this.store.appendLedger({
-            homeId,
-            threadId,
-            verb: DIVERGENCE_LEDGER_VERB,
-            fsmState: this.fleet.fsmForThread(threadId),
-            detail: { record, ...divergence },
-          });
-          this.store.enqueueWake({
+          const divergenceWakeId = this.store.enqueueWake({
             homeId,
             threadId: home.mateThreadId,
             targetMateId: home.primaryMateId,
@@ -315,14 +310,23 @@ export class StatusBridge {
             priority: 8,
             dedupeKey: `divergence:${threadId}:${divergence.kind}`,
           });
-          this.store.createInboxItem({
-            homeId,
-            threadId,
-            kind: "wake",
-            urgency: "high",
-            title: "Status vs backlog divergence",
-            body: record,
-          });
+          if (divergenceWakeId) {
+            this.store.appendLedger({
+              homeId,
+              threadId,
+              verb: DIVERGENCE_LEDGER_VERB,
+              fsmState: this.fleet.fsmForThread(threadId),
+              detail: { record, ...divergence },
+            });
+            this.store.createInboxItem({
+              homeId,
+              threadId,
+              kind: "wake",
+              urgency: "high",
+              title: "Status vs backlog divergence",
+              body: record,
+            });
+          }
         }
       }
 

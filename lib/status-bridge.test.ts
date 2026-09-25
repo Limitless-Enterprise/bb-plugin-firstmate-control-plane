@@ -85,12 +85,19 @@ function bridgeHarness(options: {
       reason: string;
       threadId: string;
       dedupeKey?: string | null;
-    }) {
+    }): string | null {
+      if (input.dedupeKey) {
+        const existing = wakes.some(
+          (wake) => wake.dedupeKey === input.dedupeKey,
+        );
+        if (existing) return null;
+      }
       wakes.push({
         reason: input.reason,
         threadId: input.threadId,
         dedupeKey: input.dedupeKey ?? null,
       });
+      return `wake-${wakes.length}`;
     },
     getHome(homeId: string) {
       return homeId === HOME.homeId ? HOME : undefined;
@@ -177,6 +184,42 @@ describe("StatusBridge scan (M1 bridge gaps)", () => {
     await bridge.scanMateHome(HOME.homeId, [checkout]);
     assert.deepEqual(decisions, [{ key: "auth-model", threadId: "thr_crew" }]);
     assert.ok(ledger.some((row) => row.verb === "crew.resolved"));
+  });
+
+  it("does not duplicate divergence ledger or inbox on status mtime rescan", async () => {
+    const checkout = await checkoutWithStatus(
+      "t1",
+      "resolved: auth-model use JWT",
+    );
+    const { bridge, wakes, inbox, ledger } = bridgeHarness({
+      holds: [
+        {
+          threadId: CREW.threadId,
+          title: "auth-model pick JWT",
+          state: "open",
+        },
+      ],
+    });
+    await bridge.scanMateHome(HOME.homeId, [checkout]);
+    const statusPath = path.join(checkout, "state", "t1.status");
+    await fs.utimes(statusPath, new Date(), new Date(Date.now() + 1000));
+    await bridge.scanMateHome(HOME.homeId, [checkout]);
+    assert.equal(
+      ledger.filter((row) => row.verb === "ledger.divergence").length,
+      1,
+    );
+    assert.equal(
+      inbox.filter((item) => item.title === "Status vs backlog divergence")
+        .length,
+      1,
+    );
+    assert.equal(
+      wakes.filter(
+        (wake) =>
+          wake.dedupeKey === "divergence:thr_crew:resolved-with-open-hold",
+      ).length,
+      1,
+    );
   });
 
   it("enqueues mate wake and inbox on resolved-with-open-hold divergence", async () => {
