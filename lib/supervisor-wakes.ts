@@ -76,7 +76,7 @@ export function hasTerminalLedgerState(
   return lastTerminal.createdAtMs > lastWorking.createdAtMs;
 }
 
-function hasIntentionalPauseState(
+export function hasIntentionalPauseState(
   probe: LedgerProbe,
   threadId: string,
 ): boolean {

@@ -6,6 +6,7 @@ import { FLEET_CHANGED, FleetService, isLegacyFleetThreadId } from "./lib/fleet-
 import { createStatusBridge } from "./lib/status-bridge";
 import { createPrPoller } from "./lib/pr-poller";
 import {
+  hasIntentionalPauseState,
   hasTerminalLedgerState,
   isSemanticallyBlocked,
   shouldEnqueueBusyAgeStall,
@@ -37,7 +38,10 @@ import { DIVERGENCE_LEDGER_VERB } from "./lib/status-divergence";
 import { PROGRESS_LEDGER_VERB } from "./lib/status-progress";
 import { parseBatchSpawnJson } from "./lib/fleet-batch-spawn";
 import { filterInboxItems } from "./lib/fleet-inbox-filters";
-import { parseGithubWebhookEvent } from "./lib/pr-github-events";
+import {
+  githubWebhookAuthorized,
+  parseGithubWebhookEvent,
+} from "./lib/pr-github-events";
 import { DEFAULT_MAX_CREW_CONCURRENCY } from "./lib/fleet-dispatch-limit";
 
 export type { rpcContract };
@@ -611,6 +615,7 @@ export default async function plugin(bb: BbPluginApi) {
               Math.floor(config.staleIdleSec / 3),
             );
             if (
+              hasIntentionalPauseState(store, node.threadId) &&
               lastPaused &&
               pauseResurfaceDueMs(
                 lastPaused.createdAtMs,
@@ -755,23 +760,24 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
-  const initialWebhookSettings = await settings.get();
-  const githubWebhookAuth =
-    initialWebhookSettings.githubWebhookSecret.trim().length > 0
-      ? "none"
-      : "token";
-
   bb.http.route(
     "POST",
     "/github/webhook",
     async (c) => {
       const webhookSettings = await settings.get();
       const webhookSecret = webhookSettings.githubWebhookSecret.trim();
-      if (webhookSecret) {
-        const headerSecret = c.req.header("X-Fleet-Webhook-Secret");
-        if (headerSecret !== webhookSecret) {
-          return c.json({ ok: false, error: "unauthorized" }, 401);
-        }
+      const bbPluginToken =
+        c.req.header("x-bb-plugin-token") ??
+        new URL(c.req.url).searchParams.get("token") ??
+        undefined;
+      if (
+        !githubWebhookAuthorized({
+          configuredSecret: webhookSecret,
+          headerSecret: c.req.header("X-Fleet-Webhook-Secret"),
+          bbPluginToken,
+        })
+      ) {
+        return c.json({ ok: false, error: "unauthorized" }, 401);
       }
       let body: unknown = null;
       try {
@@ -796,7 +802,7 @@ export default async function plugin(bb: BbPluginApi) {
       fleet.publish();
       return c.json({ ok: true });
     },
-    { auth: githubWebhookAuth },
+    { auth: "none" },
   );
 
   const usage = [

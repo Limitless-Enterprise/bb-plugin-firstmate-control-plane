@@ -34,7 +34,9 @@ function pollerHarness(
   resolveCheckState: (
     url: string,
   ) => Promise<"SUCCESS" | "FAILURE" | "PENDING" | "unavailable">,
-  snapshot: Record<string, unknown> = { state: "OPEN" },
+  snapshot:
+    | Record<string, unknown>
+    | (() => Record<string, unknown>) = { state: "OPEN" },
 ) {
   const ledger: { verb: string; threadId: string; detail?: Record<string, unknown> }[] =
     [];
@@ -91,7 +93,10 @@ function pollerHarness(
     },
   };
 
-  const fleet = { publish() { published += 1; } };
+  const fleet = {
+    publish() { published += 1; },
+    fsmForThread(_threadId: string) { return "working"; },
+  };
 
   const poller = new PrPoller(
     store as never,
@@ -102,7 +107,7 @@ function pollerHarness(
     },
     async (url) => ({
       checkState: await resolveCheckState(url),
-      snapshot,
+      snapshot: typeof snapshot === "function" ? snapshot() : snapshot,
     }),
   );
 
@@ -167,5 +172,42 @@ describe("PrPoller.pollHome (P-P2, P-P3)", () => {
       ledger.filter((row) => row.verb.startsWith("pr.checks.")).length,
       countAfterFirst,
     );
+  });
+});
+
+describe("PrPoller.pollHome lifecycle (P-P8, P-P9)", () => {
+  it("writes review-requested ledger and pr.review wake", async () => {
+    const { poller, ledger, wakes } = pollerHarness(
+      async () => "PENDING",
+      { state: "OPEN", reviewDecision: "REVIEW_REQUIRED" },
+    );
+    await poller.pollHome("tech");
+    assert.ok(ledger.some((row) => row.verb === "pr.review.requested"));
+    assert.ok(wakes.some((wake) => wake.reason.startsWith("pr.review:")));
+  });
+
+  it("writes commits-pushed ledger and pr.commits wake", async () => {
+    const { poller, ledger, wakes } = pollerHarness(
+      async () => "PENDING",
+      { state: "OPEN", mergeStateStatus: "BEHIND" },
+    );
+    await poller.pollHome("tech");
+    assert.ok(ledger.some((row) => row.verb === "pr.commits.pushed"));
+    assert.ok(wakes.some((wake) => wake.reason.startsWith("pr.commits:")));
+  });
+
+  it("retires poll keys after merge", async () => {
+    let snapshot: Record<string, unknown> = { state: "OPEN" };
+    const { poller, ledger, getSeen } = pollerHarness(
+      async () => "SUCCESS",
+      () => snapshot,
+    );
+    await poller.pollHome("tech");
+    assert.ok(getSeen()[`${CREW.threadId}:${PR_URL}`]);
+    snapshot = { state: "MERGED" };
+    await poller.pollHome("tech");
+    assert.ok(ledger.some((row) => row.verb === "pr.merged"));
+    assert.equal(getSeen()[`${CREW.threadId}:${PR_URL}`], undefined);
+    assert.equal(getSeen()[`${CREW.threadId}:${PR_URL}:lifecycle`], undefined);
   });
 });

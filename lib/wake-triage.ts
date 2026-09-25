@@ -40,6 +40,7 @@ export function isActionableWakeReason(reason: string): boolean {
   if (trimmed.startsWith("pr.checks.green:")) return true;
   if (trimmed.startsWith("pr.ready:")) return true;
   if (trimmed.startsWith("paused:resurface:")) return true;
+  if (trimmed.startsWith("instruction-refresh:")) return true;
   return trimmed.startsWith("demand-deep-inspection:");
 }
 

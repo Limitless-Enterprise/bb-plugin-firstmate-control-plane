@@ -32,6 +32,18 @@ export function heldForMergeStatusLine(prUrl: string): string {
   return `held-for-merge: ${prUrl} checks green awaiting merge`;
 }
 
+export function githubWebhookAuthorized(input: {
+  configuredSecret: string;
+  headerSecret: string | undefined;
+  bbPluginToken: string | undefined;
+}): boolean {
+  const secret = input.configuredSecret.trim();
+  if (secret.length > 0) {
+    return input.headerSecret === secret;
+  }
+  return Boolean(input.bbPluginToken?.trim());
+}
+
 export function parseGithubWebhookEvent(body: unknown): {
   action: string;
   prUrl: string | null;

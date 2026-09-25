@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  hasIntentionalPauseState,
   isSemanticallyBlocked,
   latestSemanticWorkingAtMs,
   shouldEnqueueBusyAgeStall,
@@ -179,5 +180,18 @@ describe("semantic blocked and busy-age probes", () => {
       shouldEnqueueStaleIdleSupervision("idle", p, "t1", false),
       true,
     );
+  });
+
+  it("hasIntentionalPauseState false after resume supersedes pause", () => {
+    const p = probe([
+      { verb: "crew.paused", createdAtMs: 1000 },
+      { verb: "crew.working", createdAtMs: 2000 },
+    ]);
+    assert.equal(hasIntentionalPauseState(p, "t1"), false);
+    const paused = probe([
+      { verb: "crew.working", createdAtMs: 1000 },
+      { verb: "crew.paused", createdAtMs: 2000 },
+    ]);
+    assert.equal(hasIntentionalPauseState(paused, "t1"), true);
   });
 });

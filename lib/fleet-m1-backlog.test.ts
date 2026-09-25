@@ -18,6 +18,7 @@ import {
   reconcileDesyncFsm,
 } from "./liveness-desync";
 import {
+  githubWebhookAuthorized,
   prStateFromSnapshot,
   heldForMergeStatusLine,
   parseGithubWebhookEvent,
@@ -53,6 +54,7 @@ describe("M1 backlog modules", () => {
   it("wake triage (P-W4, P-W15)", () => {
     assert.equal(isActionableWakeReason("blocked:task-1"), true);
     assert.equal(isActionableWakeReason("heartbeat:ok"), false);
+    assert.equal(isActionableWakeReason("instruction-refresh:thr-1"), true);
     assert.equal(
       shouldEnqueueMateWake("stall:thr", true),
       false,
@@ -193,6 +195,30 @@ describe("M1 backlog modules", () => {
       pull_request: { html_url: "https://github.com/o/r/pull/2" },
     });
     assert.equal(wh?.prUrl?.includes("pull/2"), true);
+    assert.equal(
+      githubWebhookAuthorized({
+        configuredSecret: "sekrit",
+        headerSecret: "sekrit",
+        bbPluginToken: undefined,
+      }),
+      true,
+    );
+    assert.equal(
+      githubWebhookAuthorized({
+        configuredSecret: "",
+        headerSecret: undefined,
+        bbPluginToken: "plugin-token",
+      }),
+      true,
+    );
+    assert.equal(
+      githubWebhookAuthorized({
+        configuredSecret: "",
+        headerSecret: undefined,
+        bbPluginToken: undefined,
+      }),
+      false,
+    );
   });
 
   it("batch spawn (B-S8)", () => {

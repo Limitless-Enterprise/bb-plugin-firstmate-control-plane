@@ -1419,13 +1419,15 @@ export class FleetService {
         continue;
       }
       this.store.markSteerSent(row.id);
+      const sentAtMs = Date.now();
       this.store.appendLedger({
         homeId,
         threadId: row.threadId,
         verb: "steer.sent",
         fsmState: "working",
-        detail: { queued: true },
+        detail: { queued: true, sentAtMs },
       });
+      await this.bb.storage.kv.set(`fleet.steerSent.${row.threadId}`, sentAtMs);
       sent += 1;
     }
     if (sent > 0) this.publish();
