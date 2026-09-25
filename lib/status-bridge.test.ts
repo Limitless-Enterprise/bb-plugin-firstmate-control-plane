@@ -62,6 +62,7 @@ function bridgeHarness(options: {
 }) {
   const ledger: { verb: string; threadId: string }[] = [];
   const wakes: { reason: string; threadId: string; dedupeKey: string | null }[] = [];
+  const inbox: { title: string; threadId: string; kind: string }[] = [];
   const decisions: { key: string; threadId: string }[] = [];
   const openHoldCalls: { title: string; threadId: string }[] = [];
   let published = 0;
@@ -100,6 +101,17 @@ function bridgeHarness(options: {
         ...CREW,
         deliveryMode: options.deliveryMode ?? CREW.deliveryMode,
       };
+    },
+    createInboxItem(input: {
+      threadId: string;
+      kind: string;
+      title: string;
+    }) {
+      inbox.push({
+        title: input.title,
+        threadId: input.threadId,
+        kind: input.kind,
+      });
     },
     listHolds(_homeId: string, state: "open" | "resolved") {
       return holds.filter((hold) => hold.state === state);
@@ -141,6 +153,7 @@ function bridgeHarness(options: {
     bridge,
     ledger,
     wakes,
+    inbox,
     decisions,
     openHoldCalls,
     get published() {
@@ -164,6 +177,38 @@ describe("StatusBridge scan (M1 bridge gaps)", () => {
     await bridge.scanMateHome(HOME.homeId, [checkout]);
     assert.deepEqual(decisions, [{ key: "auth-model", threadId: "thr_crew" }]);
     assert.ok(ledger.some((row) => row.verb === "crew.resolved"));
+  });
+
+  it("enqueues mate wake and inbox on resolved-with-open-hold divergence", async () => {
+    const checkout = await checkoutWithStatus(
+      "t1",
+      "resolved: auth-model use JWT",
+    );
+    const { bridge, wakes, inbox, ledger } = bridgeHarness({
+      holds: [
+        {
+          threadId: CREW.threadId,
+          title: "auth-model pick JWT",
+          state: "open",
+        },
+      ],
+    });
+    await bridge.scanMateHome(HOME.homeId, [checkout]);
+    assert.ok(ledger.some((row) => row.verb === "ledger.divergence"));
+    assert.ok(
+      wakes.some(
+        (wake) =>
+          wake.threadId === HOME.mateThreadId &&
+          wake.dedupeKey === "divergence:thr_crew:resolved-with-open-hold",
+      ),
+    );
+    assert.ok(
+      inbox.some(
+        (item) =>
+          item.kind === "wake" &&
+          item.title === "Status vs backlog divergence",
+      ),
+    );
   });
 
   it("appends crew.needs-decision ledger verb", async () => {

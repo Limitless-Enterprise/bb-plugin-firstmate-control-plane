@@ -307,6 +307,22 @@ export class StatusBridge {
             fsmState: this.fleet.fsmForThread(threadId),
             detail: { record, ...divergence },
           });
+          this.store.enqueueWake({
+            homeId,
+            threadId: home.mateThreadId,
+            targetMateId: home.primaryMateId,
+            reason: `divergence:${threadId}`,
+            priority: 8,
+            dedupeKey: `divergence:${threadId}:${divergence.kind}`,
+          });
+          this.store.createInboxItem({
+            homeId,
+            threadId,
+            kind: "wake",
+            urgency: "high",
+            title: "Status vs backlog divergence",
+            body: record,
+          });
         }
       }
 

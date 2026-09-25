@@ -19,6 +19,7 @@ import {
 } from "./liveness-desync";
 import {
   githubWebhookAuthorized,
+  homeHasLedgerPrUrl,
   prStateFromSnapshot,
   heldForMergeStatusLine,
   parseGithubWebhookEvent,
@@ -217,6 +218,23 @@ describe("M1 backlog modules", () => {
         headerSecret: undefined,
         bbPluginToken: undefined,
       }),
+      false,
+    );
+    const prUrl = "https://github.com/o/r/pull/2";
+    assert.equal(
+      homeHasLedgerPrUrl(
+        ["thr-a"],
+        () => [{ verb: "pr.opened", detail: { url: prUrl } }],
+        prUrl,
+      ),
+      true,
+    );
+    assert.equal(
+      homeHasLedgerPrUrl(
+        ["thr-a"],
+        () => [{ verb: "pr.opened", detail: { url: "https://github.com/o/r/pull/99" } }],
+        prUrl,
+      ),
       false,
     );
   });

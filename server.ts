@@ -22,6 +22,7 @@ import {
   awayPostureKvKey,
   buildReturnBrief,
   checkKindWakeReason,
+  instructionRefreshCursorKvKey,
   instructionRefreshReason,
   nextWedgeEscalationCount,
   pauseResurfaceDueMs,
@@ -40,6 +41,7 @@ import { parseBatchSpawnJson } from "./lib/fleet-batch-spawn";
 import { filterInboxItems } from "./lib/fleet-inbox-filters";
 import {
   githubWebhookAuthorized,
+  homeHasLedgerPrUrl,
   parseGithubWebhookEvent,
 } from "./lib/pr-github-events";
 import { DEFAULT_MAX_CREW_CONCURRENCY } from "./lib/fleet-dispatch-limit";
@@ -635,30 +637,44 @@ export default async function plugin(bb: BbPluginApi) {
                 });
               }
             }
-            const recentProgress = store
+            const compactProgress = store
               .tailLedger(node.threadId, 8)
-              .find((entry) => entry.verb === PROGRESS_LEDGER_VERB);
-            const progressDetail = recentProgress?.detail
-              ? JSON.stringify(recentProgress.detail)
-              : "";
-            if (progressDetail.toLowerCase().includes("compact")) {
-              const refreshReason = instructionRefreshReason(node.threadId);
-              if (shouldEnqueueMateWake(refreshReason, awayPosture)) {
-                store.enqueueWake({
-                  homeId: home.homeId,
-                  threadId: home.mateThreadId,
-                  targetMateId: home.primaryMateId,
-                  reason: refreshReason,
-                  priority: 2,
-                  dedupeKey: refreshReason,
-                });
-                store.appendLedger({
-                  homeId: home.homeId,
-                  threadId: node.threadId,
-                  verb: "instruction.refresh",
-                  fsmState: fsm,
-                  detail: { signal: "compact" },
-                });
+              .find((entry) => {
+                if (entry.verb !== PROGRESS_LEDGER_VERB) return false;
+                const detail = entry.detail
+                  ? JSON.stringify(entry.detail)
+                  : "";
+                return detail.toLowerCase().includes("compact");
+              });
+            if (compactProgress) {
+              const refreshCursorKey = instructionRefreshCursorKvKey(
+                node.threadId,
+              );
+              const handledCompactMs =
+                (await bb.storage.kv.get<number>(refreshCursorKey)) ?? 0;
+              if (compactProgress.createdAtMs > handledCompactMs) {
+                const refreshReason = instructionRefreshReason(node.threadId);
+                if (shouldEnqueueMateWake(refreshReason, awayPosture)) {
+                  store.enqueueWake({
+                    homeId: home.homeId,
+                    threadId: home.mateThreadId,
+                    targetMateId: home.primaryMateId,
+                    reason: refreshReason,
+                    priority: 2,
+                    dedupeKey: refreshReason,
+                  });
+                  store.appendLedger({
+                    homeId: home.homeId,
+                    threadId: node.threadId,
+                    verb: "instruction.refresh",
+                    fsmState: fsm,
+                    detail: { signal: "compact" },
+                  });
+                  await bb.storage.kv.set(
+                    refreshCursorKey,
+                    compactProgress.createdAtMs,
+                  );
+                }
               }
             }
             if (
@@ -790,6 +806,19 @@ export default async function plugin(bb: BbPluginApi) {
         return c.json({ ok: false, error: "invalid payload" }, 400);
       }
       for (const home of store.listHomes()) {
+        const crewThreadIds = store
+          .listNodes(home.homeId)
+          .filter((node) => node.kind === "crew")
+          .map((node) => node.threadId);
+        if (
+          !homeHasLedgerPrUrl(
+            crewThreadIds,
+            (threadId, limit) => store.tailLedger(threadId, limit),
+            parsed.prUrl,
+          )
+        ) {
+          continue;
+        }
         store.enqueueWake({
           homeId: home.homeId,
           threadId: home.mateThreadId,

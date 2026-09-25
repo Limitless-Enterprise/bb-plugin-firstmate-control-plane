@@ -75,6 +75,10 @@ export function instructionRefreshReason(threadId: string): string {
   return `instruction-refresh:${threadId}`;
 }
 
+export function instructionRefreshCursorKvKey(threadId: string): string {
+  return `fleet.instructionRefresh.${threadId}`;
+}
+
 export function checkKindWakeReason(kind: string): string {
   return `check:${kind}`;
 }

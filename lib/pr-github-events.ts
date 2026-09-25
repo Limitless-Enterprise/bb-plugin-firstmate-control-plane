@@ -61,6 +61,30 @@ export function webhookWakeReason(action: string, prUrl: string): string {
   return `webhook:${action}:${prUrl}`;
 }
 
+type LedgerPrRow = {
+  verb: string;
+  detail: Record<string, unknown> | null;
+};
+
+export function homeHasLedgerPrUrl(
+  crewThreadIds: string[],
+  tailLedger: (threadId: string, limit: number) => LedgerPrRow[],
+  prUrl: string,
+): boolean {
+  for (const threadId of crewThreadIds) {
+    for (const entry of tailLedger(threadId, 80)) {
+      if (
+        entry.verb === "pr.opened" &&
+        typeof entry.detail?.url === "string" &&
+        entry.detail.url === prUrl
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export function lifecycleWakeReason(
   state: PrLifecycleState,
   prUrl: string,
