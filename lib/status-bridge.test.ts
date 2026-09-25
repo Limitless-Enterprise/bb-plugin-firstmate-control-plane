@@ -146,7 +146,10 @@ function bridgeHarness(options: {
     },
   };
 
-  let cursors: Record<string, number> = {};
+  let cursors: Record<
+    string,
+    number | { mtimeMs: number; tail: string | null }
+  > = {};
   const bridge = new StatusBridge(
     store as never,
     fleet as never,
