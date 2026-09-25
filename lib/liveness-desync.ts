@@ -37,3 +37,7 @@ export function reconcileDesyncFsm(current: FsmState): FsmState {
 }
 
 export const DESYNC_LEDGER_VERB = "liveness.desync";
+
+export function livenessDesyncCursorKvKey(threadId: string): string {
+  return `fleet.livenessDesync.${threadId}`;
+}

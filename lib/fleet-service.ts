@@ -58,6 +58,7 @@ import {
 import {
   detectLivenessDesync,
   DESYNC_LEDGER_VERB,
+  livenessDesyncCursorKvKey,
   reconcileDesyncFsm,
 } from "./liveness-desync";
 import { latestSemanticWorkingAtMs } from "./supervisor-wakes";
@@ -1314,22 +1315,30 @@ export class FleetService {
         threadStatus: status,
         semanticWorking,
       });
+      const desyncCursorKey = livenessDesyncCursorKvKey(threadId);
+      const desyncEpisodeOpen =
+        (await this.bb.storage.kv.get<boolean>(desyncCursorKey)) === true;
       if (desync) {
-        try {
-          const reconciled = reconcileDesyncFsm(this.fsmForThread(threadId));
-          this.store.appendLedger({
-            homeId: node.homeId,
-            threadId,
-            verb: DESYNC_LEDGER_VERB,
-            fsmState: reconciled,
-            detail: { status, semanticWorking: true },
-          });
-          this.markThread(node.homeId, threadId, reconciled, {
-            desyncReconciled: true,
-          });
-        } catch {
-          // probe path must stay fail-soft on partial stores
+        if (!desyncEpisodeOpen) {
+          try {
+            const reconciled = reconcileDesyncFsm(this.fsmForThread(threadId));
+            this.store.appendLedger({
+              homeId: node.homeId,
+              threadId,
+              verb: DESYNC_LEDGER_VERB,
+              fsmState: reconciled,
+              detail: { status, semanticWorking: true },
+            });
+            this.markThread(node.homeId, threadId, reconciled, {
+              desyncReconciled: true,
+            });
+            await this.bb.storage.kv.set(desyncCursorKey, true);
+          } catch {
+            // probe path must stay fail-soft on partial stores
+          }
         }
+      } else if (desyncEpisodeOpen) {
+        await this.bb.storage.kv.set(desyncCursorKey, false);
       }
       return verdict;
     } catch (error) {

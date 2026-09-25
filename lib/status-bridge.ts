@@ -23,7 +23,20 @@ import {
 import { heldForMergeStatusLine } from "./pr-github-events";
 import { deliverableParkedInboxTitle } from "./fleet-captain-holds";
 
-type BridgeCursor = Record<string, number>;
+type BridgeTaskCursor = {
+  mtimeMs: number;
+  tail: string | null;
+};
+
+type BridgeCursor = Record<string, BridgeTaskCursor | number>;
+
+function normalizeBridgeTaskCursor(
+  raw: BridgeCursor[string] | undefined,
+): BridgeTaskCursor {
+  if (raw == null) return { mtimeMs: 0, tail: null };
+  if (typeof raw === "number") return { mtimeMs: raw, tail: null };
+  return raw;
+}
 
 const CURSOR_KEY = "statusBridge.cursors";
 
@@ -66,23 +79,28 @@ export class StatusBridge {
       const filePath = path.join(stateDir, name);
       const stat = await fs.stat(filePath);
       const key = `${homeId}:${taskId}`;
-      const lastMs = cursors[key] ?? 0;
-      if (stat.mtimeMs <= lastMs) continue;
+      const prior = normalizeBridgeTaskCursor(cursors[key]);
+      if (stat.mtimeMs <= prior.mtimeMs) continue;
 
-      const advanceCursor = () => {
-        cursors[key] = stat.mtimeMs;
+      const advanceCursor = (tailLine: string | null) => {
+        cursors[key] = { mtimeMs: stat.mtimeMs, tail: tailLine };
       };
 
       const raw = await fs.readFile(filePath, "utf8");
       const lines = raw.split("\n").filter((line) => line.trim());
       const tail = lines.at(-1);
       if (!tail) {
-        advanceCursor();
+        advanceCursor(null);
         continue;
       }
       const parsed = parseStatusLine(tail);
       if (!parsed) {
-        advanceCursor();
+        advanceCursor(tail);
+        continue;
+      }
+
+      if (prior.tail !== null && prior.tail === tail) {
+        advanceCursor(tail);
         continue;
       }
 
@@ -105,14 +123,14 @@ export class StatusBridge {
             },
           });
         }
-        advanceCursor();
+        advanceCursor(tail);
         ingested += 1;
         continue;
       }
 
       const threadId = await this.resolveThreadId(homeId, checkoutPath, taskId);
       if (!threadId) {
-        advanceCursor();
+        advanceCursor(tail);
         continue;
       }
 
@@ -330,7 +348,7 @@ export class StatusBridge {
         }
       }
 
-      advanceCursor();
+      advanceCursor(tail);
       ingested += 1;
     }
     await this.writeCursor(cursors);

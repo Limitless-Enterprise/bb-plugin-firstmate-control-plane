@@ -310,6 +310,22 @@ describe("StatusBridge scan (M1 bridge gaps)", () => {
     );
   });
 
+  it("does not duplicate captain-hold inbox on done: mtime rescan", async () => {
+    const checkout = await checkoutWithStatus("t1", "done: finished task");
+    const { bridge, inbox, ledger } = bridgeHarness({
+      holds: [{ threadId: CREW.threadId, title: "hold-a", state: "open" }],
+    });
+    await bridge.scanMateHome(HOME.homeId, [checkout]);
+    const statusPath = path.join(checkout, "state", "t1.status");
+    await fs.utimes(statusPath, new Date(), new Date(Date.now() + 1000));
+    await bridge.scanMateHome(HOME.homeId, [checkout]);
+    assert.equal(
+      inbox.filter((item) => item.kind === "hold").length,
+      1,
+    );
+    assert.equal(ledger.filter((row) => row.verb === "crew.done").length, 1);
+  });
+
   it("skips unchanged status files using mtime cursor (P-L6)", async () => {
     const checkout = await checkoutWithStatus("t1", "working: first pass");
     const { bridge, ledger } = bridgeHarness({});

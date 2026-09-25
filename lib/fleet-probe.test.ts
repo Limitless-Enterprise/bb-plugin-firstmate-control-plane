@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { FleetService } from "./fleet-service";
+import { DESYNC_LEDGER_VERB } from "./liveness-desync";
 import type { FleetNode } from "./types";
 
 const HOME = {
@@ -29,6 +30,7 @@ const CREW: FleetNode = {
 };
 
 function probeFleet(getThread: () => Promise<Record<string, unknown>>) {
+  const kv = new Map<string, unknown>();
   const liveness: {
     threadId: string;
     verdict: string;
@@ -76,6 +78,14 @@ function probeFleet(getThread: () => Promise<Record<string, unknown>>) {
       },
       log: { warn: () => {} },
       realtime: { publish: () => {} },
+      storage: {
+        kv: {
+          get: async (key: string) => kv.get(key) ?? null,
+          set: async (key: string, value: unknown) => {
+            kv.set(key, value);
+          },
+        },
+      },
     } as never,
     store as never,
   );
@@ -108,6 +118,64 @@ describe("probeThread pipeline (P-V3)", () => {
       throw new Error("network");
     });
     assert.equal(await fleet.probeThread("thr_crew"), "ambiguous");
+  });
+
+  it("records liveness.desync once per episode across repeated probes", async () => {
+    const kv = new Map<string, unknown>();
+    const ledger: { verb: string }[] = [];
+    const workingAt = Date.now();
+    const store = {
+      getHome: () => HOME,
+      getNodeByThread(threadId: string) {
+        if (threadId === CREW.threadId) return CREW;
+        return undefined;
+      },
+      getLiveness: () => undefined,
+      setLiveness: () => {},
+      tailLedger: () => [
+        { verb: "crew.working", createdAtMs: workingAt, detail: {} },
+      ],
+      latestLedgerByVerbs(_threadId: string, verbs: Iterable<string>) {
+        const wanted = new Set(verbs);
+        if (wanted.has("crew.working")) {
+          return { createdAtMs: workingAt };
+        }
+        return null;
+      },
+      appendLedger(row: { verb: string }) {
+        ledger.push({ verb: row.verb });
+      },
+    };
+    const fleet = new FleetService(
+      {
+        sdk: {
+          threads: {
+            get: async () => ({
+              status: "idle",
+              environmentId: "env-1",
+              runtime: { displayStatus: "idle" },
+            }),
+          },
+        },
+        log: { warn: () => {} },
+        realtime: { publish: () => {} },
+        storage: {
+          kv: {
+            get: async (key: string) => kv.get(key) ?? null,
+            set: async (key: string, value: unknown) => {
+              kv.set(key, value);
+            },
+          },
+        },
+      } as never,
+      store as never,
+    );
+    await fleet.probeThread("thr_crew");
+    await fleet.probeThread("thr_crew");
+    assert.equal(
+      ledger.filter((row) => row.verb === DESYNC_LEDGER_VERB).length,
+      1,
+    );
   });
 
   it("returns missing when thread not in registry", async () => {
