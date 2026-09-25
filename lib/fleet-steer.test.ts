@@ -46,17 +46,20 @@ describe("bb fleet steer (P-S1)", () => {
       }),
       tailLedger: () => [{ verb: "crew.working", fsmState: "working" }],
       appendLedger: (row: { verb: string }) => ledger.push(row),
+      createInboxItem: () => ({ id: "inbox-1" }),
     };
     const fleet = new FleetService(
       {
         sdk: {
           threads: {
             interactions: { list: async () => [] },
+            get: async () => ({ status: "idle" }),
             send: async () => {
               sent = true;
             },
           },
         },
+        storage: { kv: { set: async () => {}, get: async () => null } },
         log: {},
         realtime: { publish: () => {} },
       } as never,

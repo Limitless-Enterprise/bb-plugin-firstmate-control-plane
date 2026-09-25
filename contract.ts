@@ -289,6 +289,9 @@ export const rpcContract = defineRpcContract({
     input: z.object({
       homeId: z.string(),
       state: z.enum(["open", "snoozed", "resolved"]).optional(),
+      kind: z
+        .enum(["all", "hold", "wake", "liveness", "stall", "pr"])
+        .optional(),
     }),
     output: z.object({ items: z.array(inboxItemSchema) }),
   },

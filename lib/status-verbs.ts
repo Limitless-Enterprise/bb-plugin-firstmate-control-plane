@@ -9,6 +9,9 @@ const STATUS_PREFIXES = [
   "needs-decision:",
   "resolved:",
   "note:",
+  "progress:",
+  "touch:",
+  "held-for-merge:",
 ] as const;
 
 export type ParsedStatusLine = {
@@ -47,6 +50,8 @@ export function fsmFromStatusPrefix(prefix: string): FsmState | null {
     case "paused:":
     case "resolved:":
       return "idle";
+    case "held-for-merge:":
+      return "done";
     default:
       return null;
   }
@@ -62,6 +67,9 @@ export function ledgerVerbFromStatus(prefix: string): string {
     "needs-decision:": "crew.needs-decision",
     "resolved:": "crew.resolved",
     "note:": "crew.note",
+    "progress:": "crew.progress",
+    "touch:": "crew.progress",
+    "held-for-merge:": "pr.held-for-merge",
   };
   return map[prefix] ?? "crew.status";
 }

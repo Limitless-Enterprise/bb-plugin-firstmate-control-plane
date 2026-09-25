@@ -9,6 +9,18 @@ import {
   parseStatusLine,
 } from "./status-verbs";
 import { shouldEnqueuePrReadyWake } from "./fleet-bridge-helpers";
+import {
+  detectStatusBacklogDivergence,
+  DIVERGENCE_LEDGER_VERB,
+  formatDivergenceRecord,
+} from "./status-divergence";
+import {
+  isProgressOnlyStatusLine,
+  PROGRESS_LEDGER_VERB,
+  progressDetailFromLine,
+} from "./status-progress";
+import { heldForMergeStatusLine } from "./pr-github-events";
+import { deliverableParkedInboxTitle } from "./fleet-captain-holds";
 
 type BridgeCursor = Record<string, number>;
 
@@ -70,6 +82,30 @@ export class StatusBridge {
       const parsed = parseStatusLine(tail);
       if (!parsed) {
         advanceCursor();
+        continue;
+      }
+
+      if (isProgressOnlyStatusLine(parsed.raw)) {
+        const threadIdProgress = await this.resolveThreadId(
+          homeId,
+          checkoutPath,
+          taskId,
+        );
+        if (threadIdProgress) {
+          this.store.appendLedger({
+            homeId,
+            threadId: threadIdProgress,
+            verb: PROGRESS_LEDGER_VERB,
+            fsmState: this.fleet.fsmForThread(threadIdProgress),
+            detail: {
+              line: parsed.raw,
+              taskId,
+              detail: progressDetailFromLine(parsed.raw),
+            },
+          });
+        }
+        advanceCursor();
+        ingested += 1;
         continue;
       }
 
@@ -175,6 +211,103 @@ export class StatusBridge {
               dedupeKey: `pr.ready:${threadId}`,
             });
           }
+        }
+        const openHolds = this.store.listHolds(homeId, "open").map((hold) => ({
+          threadId: hold.threadId,
+          title: hold.title,
+          decisionKey: null as string | null,
+        }));
+        const divergence = detectStatusBacklogDivergence({
+          threadId,
+          taskId,
+          statusPrefix: parsed.prefix,
+          openHolds,
+          fsmState: this.fleet.fsmForThread(threadId),
+        });
+        if (divergence && home) {
+          const record = formatDivergenceRecord(divergence);
+          this.store.appendLedger({
+            homeId,
+            threadId,
+            verb: DIVERGENCE_LEDGER_VERB,
+            fsmState: this.fleet.fsmForThread(threadId),
+            detail: { record, ...divergence },
+          });
+          this.store.enqueueWake({
+            homeId,
+            threadId: home.mateThreadId,
+            targetMateId: home.primaryMateId,
+            reason: `divergence:${threadId}`,
+            priority: 8,
+            dedupeKey: `divergence:${threadId}:${divergence.kind}`,
+          });
+          this.store.createInboxItem({
+            homeId,
+            threadId,
+            kind: "wake",
+            urgency: "high",
+            title: "Status vs backlog divergence",
+            body: record,
+          });
+        }
+        const captainHolds = this.store
+          .listHolds(homeId, "open")
+          .filter((hold) => hold.threadId === threadId);
+        if (captainHolds.length > 0 && home) {
+          this.store.createInboxItem({
+            homeId,
+            threadId,
+            kind: "hold",
+            urgency: "normal",
+            title: deliverableParkedInboxTitle(taskId),
+            body: parsed.raw,
+          });
+        }
+      }
+
+      if (parsed.prefix === "held-for-merge:") {
+        this.store.appendLedger({
+          homeId,
+          threadId,
+          verb: "pr.held-for-merge",
+          fsmState: "done",
+          detail: { line: parsed.raw, taskId },
+        });
+        if (home) {
+          this.store.createInboxItem({
+            homeId,
+            threadId,
+            kind: "pr",
+            urgency: "normal",
+            title: `Held for merge: ${taskId}`,
+            body: heldForMergeStatusLine(parsePrUrl(parsed.detail) ?? parsed.detail),
+          });
+        }
+      }
+
+      if (parsed.prefix === "resolved:" && parsed.decisionKey) {
+        const openHolds = this.store.listHolds(homeId, "open").map((hold) => ({
+          threadId: hold.threadId,
+          title: hold.title,
+          decisionKey: hold.title.split(/\s+/)[0] ?? null,
+        }));
+        const divergence = detectStatusBacklogDivergence({
+          threadId,
+          taskId,
+          statusPrefix: parsed.prefix,
+          decisionKey: parsed.decisionKey,
+          openHolds,
+          fsmState: this.fleet.fsmForThread(threadId),
+        });
+        if (divergence && home) {
+          const record = formatDivergenceRecord(divergence);
+          this.store.appendLedger({
+            homeId,
+            threadId,
+            verb: DIVERGENCE_LEDGER_VERB,
+            fsmState: this.fleet.fsmForThread(threadId),
+            detail: { record, ...divergence },
+          });
         }
       }
 

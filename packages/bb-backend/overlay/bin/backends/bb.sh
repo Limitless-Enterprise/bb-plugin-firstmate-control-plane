@@ -159,6 +159,14 @@ fm_backend_bb_wait_transition() {
   return 2
 }
 
+fm_backend_bb_commit_transition() {
+  return 2
+}
+
+fm_backend_bb_clear_transition() {
+  return 0
+}
+
 fm_backend_bb_validate_spawn() {
   fm_bb_load_config || return 1
   if [ "$FM_BB_ENABLED" != 1 ]; then

@@ -82,6 +82,16 @@ if fm_backend_bb_wait_transition "@thread:fake" 2>/dev/null; then
   exit 1
 fi
 
+if fm_backend_bb_commit_transition "@thread:fake" 2>/dev/null; then
+  echo "B-O11: commit_transition should fail-closed on bb" >&2
+  exit 1
+fi
+
+if ! fm_backend_bb_clear_transition "@thread:fake"; then
+  echo "B-O11: clear_transition should no-op succeed on bb" >&2
+  exit 1
+fi
+
 if ! fm_backend_bb_validate_spawn; then
   echo "B-W4: validate_spawn should succeed with enabled integration + bb" >&2
   exit 1

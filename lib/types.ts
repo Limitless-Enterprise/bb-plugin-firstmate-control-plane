@@ -109,6 +109,9 @@ export const inboxItemSchema = z.object({
   resolvedAtMs: z.number().nullable(),
 });
 
+export const holdKinds = ["decision", "captain", "authority"] as const;
+export type HoldKind = (typeof holdKinds)[number];
+
 export const holdSchema = z.object({
   id: z.string(),
   homeId: z.string(),
@@ -116,6 +119,7 @@ export const holdSchema = z.object({
   threadId: z.string(),
   title: z.string(),
   body: z.string(),
+  holdKind: z.enum(holdKinds),
   urgency: z.enum(urgencies),
   state: z.enum(["open", "resolved"]),
   createdAtMs: z.number(),

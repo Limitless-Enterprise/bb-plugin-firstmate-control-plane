@@ -38,4 +38,13 @@ if ! printf '%s' "$relaunch_out" | grep -q '^native-spawn:'; then
   exit 1
 fi
 
+batch_spec="$(mktemp)"
+printf '%s\n' '[{"label":"a","role":"ship","prompt":"go"}]' >"$batch_spec"
+batch_out="$(FM_BB_BACKEND_ROOT="$ROOT" "$ROOT/bin/fm-spawn-wrap.sh" --batch-file "$batch_spec" 2>&1)" || true
+rm -f "$batch_spec"
+if ! printf '%s' "$batch_out" | grep -q '^bb-spawn:'; then
+  echo "B-S8: --batch-file should route to bb spawn, got: $batch_out" >&2
+  exit 1
+fi
+
 echo "spawn-wrap M1 contract checks passed"

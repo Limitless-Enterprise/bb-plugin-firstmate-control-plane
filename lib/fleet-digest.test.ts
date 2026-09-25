@@ -89,6 +89,7 @@ describe("fleet digest and bearings (P-C4, B-ST3)", () => {
       threadId: "thr_crew",
       title: "pick auth model",
       body: "needs-decision:",
+      holdKind: "decision",
       urgency: "high",
       state: "open",
       createdAtMs: 1,

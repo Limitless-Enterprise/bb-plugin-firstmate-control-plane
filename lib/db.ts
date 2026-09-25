@@ -4,6 +4,7 @@ import type {
   DeliveryMode,
   FleetNode,
   Hold,
+  HoldKind,
   Home,
   InboxItem,
   InboxState,
@@ -108,6 +109,18 @@ export const migrations = [
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS steer_queue (
+    id TEXT PRIMARY KEY,
+    home_id TEXT NOT NULL,
+    thread_id TEXT NOT NULL,
+    text TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at_ms INTEGER NOT NULL,
+    sent_at_ms INTEGER
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_steer_queue_home ON steer_queue(home_id, state, created_at_ms)`,
+  `ALTER TABLE holds ADD COLUMN hold_kind TEXT NOT NULL DEFAULT 'decision'`,
 ];
 
 type NodeRow = {
@@ -605,14 +618,16 @@ export class FleetStore {
     title: string;
     body: string;
     urgency?: Urgency;
+    holdKind?: HoldKind;
   }): Hold {
     const id = randomUUID();
     const createdAtMs = Date.now();
     const urgency = input.urgency ?? "normal";
+    const holdKind = input.holdKind ?? "decision";
     this.db
       .prepare(
-        `INSERT INTO holds (id, home_id, mate_id, thread_id, title, body, urgency, state, created_at_ms)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
+        `INSERT INTO holds (id, home_id, mate_id, thread_id, title, body, urgency, state, created_at_ms, hold_kind)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`,
       )
       .run(
         id,
@@ -623,6 +638,7 @@ export class FleetStore {
         input.body,
         urgency,
         createdAtMs,
+        holdKind,
       );
     return {
       id,
@@ -631,6 +647,7 @@ export class FleetStore {
       threadId: input.threadId,
       title: input.title,
       body: input.body,
+      holdKind,
       urgency,
       state: "open",
       createdAtMs,
@@ -651,14 +668,14 @@ export class FleetStore {
       ? this.db
           .prepare(
             `SELECT id, home_id AS homeId, mate_id AS mateId, thread_id AS threadId,
-             title, body, urgency, state, created_at_ms AS createdAtMs, resolved_at_ms AS resolvedAtMs
+             title, body, hold_kind AS holdKind, urgency, state, created_at_ms AS createdAtMs, resolved_at_ms AS resolvedAtMs
              FROM holds WHERE home_id = ? AND state = ? ORDER BY created_at_ms DESC`,
           )
           .all(homeId, state)
       : this.db
           .prepare(
             `SELECT id, home_id AS homeId, mate_id AS mateId, thread_id AS threadId,
-             title, body, urgency, state, created_at_ms AS createdAtMs, resolved_at_ms AS resolvedAtMs
+             title, body, hold_kind AS holdKind, urgency, state, created_at_ms AS createdAtMs, resolved_at_ms AS resolvedAtMs
              FROM holds WHERE home_id = ? ORDER BY created_at_ms DESC`,
           )
           .all(homeId)) as Hold[];
@@ -934,5 +951,72 @@ export class FleetStore {
       }
     }
     return dead;
+  }
+
+  enqueueSteer(input: {
+    homeId: string;
+    threadId: string;
+    text: string;
+  }): string {
+    const id = randomUUID();
+    const createdAtMs = Date.now();
+    this.db
+      .prepare(
+        `INSERT INTO steer_queue (id, home_id, thread_id, text, state, attempts, created_at_ms)
+         VALUES (?, ?, ?, ?, 'pending', 0, ?)`,
+      )
+      .run(id, input.homeId, input.threadId, input.text, createdAtMs);
+    return id;
+  }
+
+  listPendingSteer(homeId: string, threadId?: string): {
+    id: string;
+    homeId: string;
+    threadId: string;
+    text: string;
+    attempts: number;
+    createdAtMs: number;
+  }[] {
+    const rows = (threadId
+      ? this.db
+          .prepare(
+            `SELECT id, home_id AS homeId, thread_id AS threadId, text, attempts,
+             created_at_ms AS createdAtMs FROM steer_queue
+             WHERE home_id = ? AND thread_id = ? AND state = 'pending' ORDER BY created_at_ms ASC`,
+          )
+          .all(homeId, threadId)
+      : this.db
+          .prepare(
+            `SELECT id, home_id AS homeId, thread_id AS threadId, text, attempts,
+             created_at_ms AS createdAtMs FROM steer_queue
+             WHERE home_id = ? AND state = 'pending' ORDER BY created_at_ms ASC`,
+          )
+          .all(homeId)) as {
+      id: string;
+      homeId: string;
+      threadId: string;
+      text: string;
+      attempts: number;
+      createdAtMs: number;
+    }[];
+    return rows;
+  }
+
+  markSteerSent(id: string): void {
+    this.db
+      .prepare(
+        "UPDATE steer_queue SET state = 'sent', sent_at_ms = ? WHERE id = ?",
+      )
+      .run(Date.now(), id);
+  }
+
+  incrementSteerAttempt(id: string): number {
+    this.db
+      .prepare("UPDATE steer_queue SET attempts = attempts + 1 WHERE id = ?")
+      .run(id);
+    const row = this.db
+      .prepare("SELECT attempts FROM steer_queue WHERE id = ?")
+      .get(id) as { attempts: number } | undefined;
+    return row?.attempts ?? 0;
   }
 }

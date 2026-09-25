@@ -1,4 +1,5 @@
 import { type BbPluginApi } from "@get-bb/plugin-sdk";
+import * as fs from "node:fs/promises";
 import { rpcContract } from "./contract";
 import { FleetStore, migrations } from "./lib/db";
 import { FLEET_CHANGED, FleetService, isLegacyFleetThreadId } from "./lib/fleet-service";
@@ -15,6 +16,17 @@ import {
   livenessWakeDedupeKey,
   shouldSupervisorRespawnWake,
 } from "./lib/respawn-policy";
+import { shouldEnqueueMateWake } from "./lib/wake-triage";
+import {
+  awayPostureKvKey,
+  buildReturnBrief,
+  checkKindWakeReason,
+  startupInactiveScanReason,
+} from "./lib/supervisor-policy";
+import { parseBatchSpawnJson } from "./lib/fleet-batch-spawn";
+import { filterInboxItems } from "./lib/fleet-inbox-filters";
+import { parseGithubWebhookEvent } from "./lib/pr-github-events";
+import { DEFAULT_MAX_CREW_CONCURRENCY } from "./lib/fleet-dispatch-limit";
 
 export type { rpcContract };
 
@@ -98,6 +110,11 @@ export default async function plugin(bb: BbPluginApi) {
       label: "Default parent directory for new mate home checkouts",
       default: "/workspace/Codes",
     },
+    maxCrewConcurrency: {
+      type: "string",
+      label: "Max concurrent active crews per home (dispatch wait)",
+      default: String(DEFAULT_MAX_CREW_CONCURRENCY),
+    },
   });
 
   const db = bb.storage.database();
@@ -148,8 +165,20 @@ export default async function plugin(bb: BbPluginApi) {
       busyAgeSec,
       staleIdleSec,
       cosThreadId: values.cosThreadId.trim() || null,
+      maxCrewConcurrency: Math.max(
+        1,
+        Number.parseInt(values.maxCrewConcurrency, 10) ||
+          DEFAULT_MAX_CREW_CONCURRENCY,
+      ),
     };
   };
+
+  const applyRuntimeLimits = async () => {
+    const config = await getConfig();
+    fleet.setCosThreadId(config.cosThreadId);
+    fleet.setRuntimeLimits({ maxConcurrency: config.maxCrewConcurrency });
+  };
+  await applyRuntimeLimits();
 
   const resolveHomeId = (homeId?: string | null): string => {
     const id = homeId ?? store.getSelectedHomeId();
@@ -254,7 +283,10 @@ export default async function plugin(bb: BbPluginApi) {
       holds: store.listHolds(input.homeId, input.state),
     }),
     listInbox: (input) => ({
-      items: store.listInbox(input.homeId, input.state),
+      items: filterInboxItems(
+        store.listInbox(input.homeId, input.state),
+        input.kind ?? "all",
+      ),
     }),
     snoozeInbox: (input) => {
       fleet.assertHome(input.homeId);
@@ -454,6 +486,36 @@ export default async function plugin(bb: BbPluginApi) {
           });
         };
         await refreshSupervisorLock();
+        await applyRuntimeLimits();
+        await bb.storage.kv.set("fleet.supervisor.beaconMs", Date.now());
+        const startupDone = await bb.storage.kv.get<boolean>(
+          "fleet.supervisor.startupScan",
+        );
+        if (!startupDone) {
+          for (const home of store.listHomes()) {
+            for (const node of store.listNodes(home.homeId)) {
+              if (node.kind === "crew" && fleet.fsmForThread(node.threadId) === "idle") {
+                store.enqueueWake({
+                  homeId: home.homeId,
+                  threadId: home.mateThreadId,
+                  targetMateId: home.primaryMateId,
+                  reason: startupInactiveScanReason(node.threadId),
+                  priority: 2,
+                  dedupeKey: `startup-inactive:${node.threadId}`,
+                });
+              }
+            }
+            store.enqueueWake({
+              homeId: home.homeId,
+              threadId: home.mateThreadId,
+              targetMateId: home.primaryMateId,
+              reason: checkKindWakeReason("startup"),
+              priority: 1,
+              dedupeKey: `check:startup:${home.homeId}`,
+            });
+          }
+          await bb.storage.kv.set("fleet.supervisor.startupScan", true);
+        }
 
         const homes = store.listHomes();
         for (const home of homes) {
@@ -529,17 +591,25 @@ export default async function plugin(bb: BbPluginApi) {
                 last &&
                 Date.now() - last.createdAtMs > config.staleIdleSec * 1000
               ) {
-                store.enqueueWake({
-                  homeId: home.homeId,
-                  threadId: home.mateThreadId,
-                  targetMateId: home.primaryMateId,
-                  reason: `stale-idle:${node.threadId}`,
-                  priority: 3,
-                  dedupeKey: `stale-idle:${node.threadId}`,
-                });
+                const away = await bb.storage.kv.get<boolean>(
+                  awayPostureKvKey(home.homeId),
+                );
+                const reason = `stale-idle:${node.threadId}`;
+                if (shouldEnqueueMateWake(reason, away === true)) {
+                  store.enqueueWake({
+                    homeId: home.homeId,
+                    threadId: home.mateThreadId,
+                    targetMateId: home.primaryMateId,
+                    reason,
+                    priority: 3,
+                    dedupeKey: `stale-idle:${node.threadId}`,
+                  });
+                }
               }
             }
           }
+          await fleet.processSteerQueues(home.homeId);
+          await fleet.checkPostSteerStalls(home.homeId);
         }
         fleet.publish();
         await new Promise<void>((resolve) => {
@@ -556,6 +626,36 @@ export default async function plugin(bb: BbPluginApi) {
       }
     },
   });
+
+  bb.http.route(
+    "POST",
+    "/github/webhook",
+    async (c) => {
+      let body: unknown = null;
+      try {
+        body = await c.req.json();
+      } catch {
+        body = null;
+      }
+      const parsed = parseGithubWebhookEvent(body);
+      if (!parsed?.prUrl) {
+        return c.json({ ok: false, error: "invalid payload" }, 400);
+      }
+      for (const home of store.listHomes()) {
+        store.enqueueWake({
+          homeId: home.homeId,
+          threadId: home.mateThreadId,
+          targetMateId: home.primaryMateId,
+          reason: `webhook:${parsed.action}:${parsed.prUrl}`,
+          priority: 6,
+          dedupeKey: `webhook:${parsed.action}:${parsed.prUrl}`,
+        });
+      }
+      fleet.publish();
+      return c.json({ ok: true });
+    },
+    { auth: "none" },
+  );
 
   const usage = [
     "Usage:",
@@ -769,6 +869,16 @@ export default async function plugin(bb: BbPluginApi) {
             break;
           }
           case "spawn": {
+            const batchFile = flags.get("batch-file");
+            if (typeof batchFile === "string") {
+              const raw = await fs.readFile(batchFile, "utf8");
+              const specs = parseBatchSpawnJson(raw);
+              const nodes = await fleet.spawnCrewBatch(homeId(), specs);
+              return reply(
+                { count: nodes.length, nodes },
+                `Batch spawned ${nodes.length} crews`,
+              );
+            }
             const label = flags.get("label");
             const role = flags.get("role");
             const prompt = flags.get("prompt");
@@ -964,6 +1074,30 @@ export default async function plugin(bb: BbPluginApi) {
               results,
               results.map((r) => `${r.label}\t${r.verdict}`).join("\n"),
             );
+          }
+          case "away": {
+            const id = homeId();
+            const mode = rest[0];
+            if (mode === "on") {
+              await bb.storage.kv.set(awayPostureKvKey(id), true);
+              await bb.storage.kv.set(`${awayPostureKvKey(id)}.since`, Date.now());
+              return reply(null, "Away posture on");
+            }
+            if (mode === "off") {
+              const since =
+                (await bb.storage.kv.get<number>(`${awayPostureKvKey(id)}.since`)) ??
+                Date.now();
+              await bb.storage.kv.set(awayPostureKvKey(id), false);
+              const brief = buildReturnBrief({
+                awayStartedMs: since,
+                nowMs: Date.now(),
+                inboxOpened: store.countOpenInbox(id),
+                wakesUnacked: store.countUnackedWakes(id),
+                divergences: 0,
+              });
+              return reply({ brief }, brief);
+            }
+            return { exitCode: 1, stderr: "Usage: bb fleet away on|off" };
           }
           case "digest": {
             const id = homeId();

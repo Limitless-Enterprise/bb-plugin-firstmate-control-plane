@@ -35,6 +35,15 @@ fi
 
 for arg in "${ORIGINAL_ARGS[@]}"; do
   case "$arg" in
+    --batch-file|--batch-file=*)
+      printf 'bb-spawn:%s\n' "$*"
+      exit 0
+      ;;
+  esac
+done
+
+for arg in "${ORIGINAL_ARGS[@]}"; do
+  case "$arg" in
     --relaunch|--secondmate)
       native_spawn
       ;;

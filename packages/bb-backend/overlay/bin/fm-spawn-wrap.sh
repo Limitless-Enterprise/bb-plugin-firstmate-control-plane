@@ -32,6 +32,9 @@ if [ "$USE_BB" = 1 ]; then
       --relaunch|--secondmate)
         exec "$NATIVE" "$@"
         ;;
+      --batch-file|--batch-file=*)
+        exec "$BB_SPAWN" "$@"
+        ;;
     esac
   done
   exec "$BB_SPAWN" "$@"

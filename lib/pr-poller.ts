@@ -3,6 +3,10 @@ import { promisify } from "node:util";
 import type { FleetService } from "./fleet-service";
 import type { FleetStore } from "./db";
 import { parsePrUrl } from "./status-verbs";
+import {
+  shouldRetirePollAfterMerge,
+  type GhPrSnapshot,
+} from "./pr-github-events";
 
 const execFileAsync = promisify(execFile);
 
@@ -19,16 +23,16 @@ async function ghPrCheckState(
         "view",
         prUrl,
         "--json",
-        "statusCheckRollup,mergeStateStatus,state",
+        "statusCheckRollup,mergeStateStatus,state,reviewDecision,headRefOid",
       ],
       { timeout: 15_000 },
     );
-    const payload = JSON.parse(stdout) as {
-      state?: string;
-      mergeStateStatus?: string;
+    const payload = JSON.parse(stdout) as GhPrSnapshot & {
       statusCheckRollup?: { state?: string }[];
     };
-    if (payload.state === "MERGED") return "SUCCESS";
+    if (payload.state === "MERGED") {
+      return "SUCCESS";
+    }
     const rollup = payload.statusCheckRollup ?? [];
     if (rollup.length === 0) return "PENDING";
     if (rollup.some((item) => item.state === "FAILURE")) return "FAILURE";

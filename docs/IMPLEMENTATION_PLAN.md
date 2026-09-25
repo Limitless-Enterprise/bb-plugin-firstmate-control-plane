@@ -166,7 +166,7 @@ See `docs/CAPABILITY_INVENTORY.md` for the full B-* / P-* / U-* item list (all r
 
 ## 8. M1 acceptance criteria (inventory authoritative)
 
-M1 is **complete** only when **`docs/CAPABILITY_INVENTORY.md` has zero M1 🔲 or ⚠ rows** and **`scripts/m1-inventory-gate.sh`** passes (`pnpm test` including `scripts/bb-backend-m1-contract.sh` and `scripts/spawn-wrap-m1-contract.sh`, typecheck, inventory scan). Until then, the gate **exits 1** on remaining **M1 ✓** **🔲** rows (expected after batch 5 cleared all **M1 ✓** **⚠** partials).
+M1 is **complete** when **`docs/CAPABILITY_INVENTORY.md` has zero M1 🔲 or ⚠ rows** and **`scripts/m1-inventory-gate.sh`** passes (`pnpm test` including `scripts/bb-backend-m1-contract.sh` and `scripts/spawn-wrap-m1-contract.sh`, typecheck, inventory scan). Batch 6 closed the remaining M1 🔲 backlog (2026-09-25).
 
 See **`docs/M1_ACCEPTANCE_MATRIX.md`** for traceability. Fast smoke: **`scripts/m1-ac-full.sh`** (24 checks) — required before merge but not sufficient alone.
 

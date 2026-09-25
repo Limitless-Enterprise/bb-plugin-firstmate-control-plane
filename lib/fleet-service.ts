@@ -38,9 +38,39 @@ import type {
   Digest,
   FleetNode,
   FsmState,
+  HoldKind,
   LivenessVerdict,
   TreeNode,
 } from "./types";
+import type { BatchSpawnSpec } from "./fleet-batch-spawn";
+import {
+  canDispatchCrew,
+  countActiveCrewSlots,
+  DEFAULT_MAX_CREW_CONCURRENCY,
+  dispatchWaitMessage,
+} from "./fleet-dispatch-limit";
+import {
+  authorityEscalationWakeReason,
+  captainHoldDefaultUrgency,
+  normalizeHoldKind,
+  routeHoldNotifyThreadId,
+} from "./fleet-captain-holds";
+import {
+  detectLivenessDesync,
+  DESYNC_LEDGER_VERB,
+  reconcileDesyncFsm,
+} from "./liveness-desync";
+import { latestSemanticWorkingAtMs } from "./supervisor-wakes";
+import {
+  CAPTAIN_ATTACH_LEDGER_VERB,
+  doorbellNudgeText,
+  isThreadReadyForSteer,
+  shouldFirePostSteerStallWatchdog,
+  shouldQueueSteerWhileBusy,
+  shouldRetryUnconfirmedSubmit,
+  steerInboxTitle,
+} from "./fleet-steer-delivery";
+import { DIVERGENCE_LEDGER_VERB } from "./status-divergence";
 
 export const FLEET_CHANGED = "fleet-changed";
 
@@ -88,17 +118,44 @@ export type FleetConfig = {
   defaultParentDir: string;
 };
 
+export type FleetRuntimeLimits = {
+  maxConcurrency: number;
+  postSteerStallSec: number;
+};
+
+export const DEFAULT_FLEET_RUNTIME_LIMITS: FleetRuntimeLimits = {
+  maxConcurrency: DEFAULT_MAX_CREW_CONCURRENCY,
+  postSteerStallSec: 300,
+};
+
 export const DEFAULT_FLEET_CONFIG: FleetConfig = {
   firstmateRepoUrl: DEFAULT_FIRSTMATE_REPO_URL,
   defaultParentDir: DEFAULT_PARENT_DIR,
 };
 
 export class FleetService {
+  private runtimeLimits: FleetRuntimeLimits = {
+    ...DEFAULT_FLEET_RUNTIME_LIMITS,
+  };
+  private cosThreadId: string | null = null;
+
   constructor(
     private readonly bb: BbPluginApi,
     readonly store: FleetStore,
     private readonly config: FleetConfig = DEFAULT_FLEET_CONFIG,
   ) {}
+
+  setCosThreadId(threadId: string | null): void {
+    this.cosThreadId = threadId?.trim() ? threadId.trim() : null;
+  }
+
+  setRuntimeLimits(partial: Partial<FleetRuntimeLimits>): void {
+    this.runtimeLimits = { ...this.runtimeLimits, ...partial };
+  }
+
+  getRuntimeLimits(): FleetRuntimeLimits {
+    return this.runtimeLimits;
+  }
 
   getConfig(): FleetConfig {
     return this.config;
@@ -994,21 +1051,35 @@ export class FleetService {
     title: string;
     body: string;
     urgency?: "low" | "normal" | "high";
+    holdKind?: HoldKind;
   }) {
     this.assertHome(input.homeId);
-    const hold = this.store.createHold(input);
+    const holdKind = normalizeHoldKind(input.holdKind);
+    const urgency =
+      input.urgency ?? captainHoldDefaultUrgency(holdKind);
+    const hold = this.store.createHold({ ...input, holdKind, urgency });
     this.store.upsertInboxFromHold(hold);
     this.markThread(input.homeId, input.threadId, "blocked", {
       holdId: hold.id,
+      holdKind,
     });
     const home = this.store.getHome(input.homeId);
     if (home) {
+      const notifyThreadId = routeHoldNotifyThreadId({
+        holdKind,
+        mateThreadId: home.mateThreadId,
+        cosThreadId: this.cosThreadId,
+      });
+      const wakeReason =
+        holdKind === "authority"
+          ? authorityEscalationWakeReason(hold.id)
+          : `hold:${hold.id}`;
       this.store.enqueueWake({
         homeId: input.homeId,
-        threadId: home.mateThreadId,
+        threadId: notifyThreadId,
         targetMateId: home.primaryMateId,
-        reason: `hold:${hold.id}`,
-        priority: input.urgency === "high" ? 10 : 5,
+        reason: wakeReason,
+        priority: urgency === "high" ? 10 : 5,
         dedupeKey: `hold:${hold.id}`,
       });
     }
@@ -1163,6 +1234,13 @@ export class FleetService {
       `${openInbox} inbox, ${openHolds} holds, ${unackedWakes} wakes`,
     ];
     if (mateDown) summaryParts.unshift("MATE DOWN");
+    const divergences = this.store
+      .listNodes(homeId)
+      .flatMap((node) => this.store.tailLedger(node.threadId, 30))
+      .filter((entry) => entry.verb === DIVERGENCE_LEDGER_VERB).length;
+    if (divergences > 0) {
+      summaryParts.push(`${divergences} divergence(s)`);
+    }
     const summary = summaryParts.join(" · ");
     return {
       homeId,
@@ -1227,6 +1305,32 @@ export class FleetService {
         runtimeStatus,
         environmentId: thread.environmentId,
       });
+      const semanticWorking =
+        typeof this.store.tailLedger === "function" &&
+        latestSemanticWorkingAtMs(this.store, threadId) !== null;
+      const desync = detectLivenessDesync({
+        threadId,
+        liveness: verdict,
+        threadStatus: status,
+        semanticWorking,
+      });
+      if (desync) {
+        try {
+          const reconciled = reconcileDesyncFsm(this.fsmForThread(threadId));
+          this.store.appendLedger({
+            homeId: node.homeId,
+            threadId,
+            verb: DESYNC_LEDGER_VERB,
+            fsmState: reconciled,
+            detail: { status, semanticWorking: true },
+          });
+          this.markThread(node.homeId, threadId, reconciled, {
+            desyncReconciled: true,
+          });
+        } catch {
+          // probe path must stay fail-soft on partial stores
+        }
+      }
       return verdict;
     } catch (error) {
       const prev = this.store.getLiveness(threadId);
@@ -1242,33 +1346,177 @@ export class FleetService {
     }
   }
 
+  private async threadSteerProbe(threadId: string): Promise<{
+    pendingInteraction: boolean;
+    threadStatus: string;
+  }> {
+    const interactions = await this.bb.sdk.threads.interactions.list({
+      threadId,
+    });
+    const pendingInteraction = interactions.some(
+      (item) => item.status === "pending",
+    );
+    let threadStatus = "unknown";
+    try {
+      const thread = await this.bb.sdk.threads.get({ threadId });
+      threadStatus = thread?.status ?? "unknown";
+    } catch {
+      threadStatus = "unknown";
+    }
+    return { pendingInteraction, threadStatus };
+  }
+
+  private async sendSteerText(
+    threadId: string,
+    text: string,
+  ): Promise<"sent" | "unconfirmed"> {
+    try {
+      await this.bb.sdk.threads.send({
+        threadId,
+        mode: "auto",
+        input: [{ type: "text", text, mentions: [] }],
+      });
+      return "sent";
+    } catch {
+      return "unconfirmed";
+    }
+  }
+
+  async processSteerQueues(homeId: string): Promise<number> {
+    this.assertHome(homeId);
+    let sent = 0;
+    for (const row of this.store.listPendingSteer(homeId)) {
+      const probe = await this.threadSteerProbe(row.threadId);
+      if (probe.pendingInteraction) continue;
+      if (!isThreadReadyForSteer(probe)) continue;
+      let attempts = row.attempts;
+      let result: "sent" | "unconfirmed" = "unconfirmed";
+      while (shouldRetryUnconfirmedSubmit(result, attempts)) {
+        result = await this.sendSteerText(row.threadId, row.text);
+        attempts = this.store.incrementSteerAttempt(row.id);
+      }
+      if (result !== "sent") continue;
+      this.store.markSteerSent(row.id);
+      this.store.appendLedger({
+        homeId,
+        threadId: row.threadId,
+        verb: "steer.sent",
+        fsmState: "working",
+        detail: { queued: true },
+      });
+      sent += 1;
+    }
+    if (sent > 0) this.publish();
+    return sent;
+  }
+
   async steer(homeId: string, threadId: string, text: string): Promise<void> {
     this.assertHome(homeId);
     const node = this.store.getNodeByThread(threadId);
     if (node) this.assertNodeHome(node, homeId);
-    const interactions = await this.bb.sdk.threads.interactions.list({
-      threadId,
-    });
-    const pending = interactions.some((item) => item.status === "pending");
-    if (pending) {
+    const probe = await this.threadSteerProbe(threadId);
+    if (probe.pendingInteraction) {
       throw new Error("Cannot steer while interaction is pending.");
     }
     const state = this.fsmForThread(threadId);
     if (state === "unknown") {
       throw new Error("Cannot steer thread in unknown state.");
     }
-    await this.bb.sdk.threads.send({
-      threadId,
-      mode: "auto",
-      input: [{ type: "text", text, mentions: [] }],
-    });
+    const label = node?.label ?? threadId;
+    if (typeof this.store.createInboxItem === "function") {
+      this.store.createInboxItem({
+        homeId,
+        threadId,
+        kind: "wake",
+        urgency: "normal",
+        title: steerInboxTitle(label),
+        body: text,
+      });
+    }
+    if (shouldQueueSteerWhileBusy(probe)) {
+      this.store.enqueueSteer({ homeId, threadId, text });
+      this.publish();
+      return;
+    }
+    const readyDeadline = Date.now() + 30_000;
+    while (
+      !isThreadReadyForSteer(await this.threadSteerProbe(threadId)) &&
+      Date.now() < readyDeadline
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    let attempts = 0;
+    let result: "sent" | "unconfirmed" = "unconfirmed";
+    while (shouldRetryUnconfirmedSubmit(result, attempts)) {
+      result = await this.sendSteerText(threadId, text);
+      attempts += 1;
+    }
+    if (result !== "sent") {
+      this.store.enqueueSteer({ homeId, threadId, text });
+      this.publish();
+      return;
+    }
+    const sentAtMs = Date.now();
     this.store.appendLedger({
       homeId,
       threadId,
       verb: "steer.sent",
       fsmState: "working",
+      detail: { sentAtMs },
+    });
+    await this.bb.storage.kv.set(`fleet.steerSent.${threadId}`, sentAtMs);
+    this.publish();
+  }
+
+  async nudgeThread(homeId: string, threadId: string): Promise<void> {
+    const node = this.store.getNodeByThread(threadId);
+    const label = node?.label ?? threadId;
+    await this.steer(homeId, threadId, doorbellNudgeText(label));
+  }
+
+  recordCaptainAttach(homeId: string, threadId: string): void {
+    this.assertHome(homeId);
+    this.store.appendLedger({
+      homeId,
+      threadId,
+      verb: CAPTAIN_ATTACH_LEDGER_VERB,
+      fsmState: this.fsmForThread(threadId),
+      detail: { attachedAtMs: Date.now() },
     });
     this.publish();
+  }
+
+  async checkPostSteerStalls(homeId: string): Promise<void> {
+    const stallSec = this.runtimeLimits.postSteerStallSec;
+    const nowMs = Date.now();
+    for (const node of this.store.listNodes(homeId)) {
+      if (node.kind !== "crew") continue;
+      const sentAt = await this.bb.storage.kv.get<number>(
+        `fleet.steerSent.${node.threadId}`,
+      );
+      if (!sentAt) continue;
+      const lastProgress = this.store
+        .tailLedger(node.threadId, 20)
+        .find((entry) => entry.verb === "crew.progress" || entry.verb === "crew.working");
+      if (
+        shouldFirePostSteerStallWatchdog({
+          steerSentAtMs: sentAt,
+          lastProgressAtMs: lastProgress?.createdAtMs ?? null,
+          nowMs,
+          stallSec,
+        })
+      ) {
+        const home = this.store.getHome(homeId)!;
+        this.store.enqueueWake({
+          homeId,
+          threadId: home.mateThreadId,
+          targetMateId: home.primaryMateId,
+          reason: `stall:post-steer:${node.threadId}`,
+          priority: 5,
+          dedupeKey: `stall:post-steer:${node.threadId}`,
+        });
+      }
+    }
   }
 
   async interrupt(homeId: string, threadId: string): Promise<void> {
@@ -1539,6 +1787,30 @@ export class FleetService {
     return { removed, skipped };
   }
 
+  async waitForDispatchSlot(homeId: string, maxWaitMs = 120_000): Promise<void> {
+    if (typeof this.store.listNodes !== "function") {
+      return;
+    }
+    const started = Date.now();
+    while (Date.now() - started < maxWaitMs) {
+      const active = countActiveCrewSlots(
+        this.store.listNodes(homeId),
+        (threadId) => this.fsmForThread(threadId),
+      );
+      if (canDispatchCrew(active, this.runtimeLimits.maxConcurrency)) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+    const active = countActiveCrewSlots(
+      this.store.listNodes(homeId),
+      (threadId) => this.fsmForThread(threadId),
+    );
+    throw new Error(
+      dispatchWaitMessage(active, this.runtimeLimits.maxConcurrency),
+    );
+  }
+
   async spawnCrew(input: {
     homeId: string;
     label: string;
@@ -1551,6 +1823,7 @@ export class FleetService {
     yolo?: boolean;
   }): Promise<FleetNode> {
     this.assertHome(input.homeId);
+    await this.waitForDispatchSlot(input.homeId);
     const home = this.store.getHome(input.homeId)!;
     const projectId = await this.resolveProjectId(input.projectId);
     const profile = input.profileId
@@ -1653,5 +1926,26 @@ export class FleetService {
       }
     }
     return { ...node, worktreePath };
+  }
+
+  async spawnCrewBatch(
+    homeId: string,
+    specs: BatchSpawnSpec[],
+  ): Promise<FleetNode[]> {
+    const nodes: FleetNode[] = [];
+    for (const spec of specs) {
+      nodes.push(
+        await this.spawnCrew({
+          homeId,
+          label: spec.label,
+          role: spec.role,
+          prompt: spec.prompt,
+          profileId: spec.profileId ?? undefined,
+          deliveryMode: spec.deliveryMode,
+          yolo: spec.yolo,
+        }),
+      );
+    }
+    return nodes;
   }
 }

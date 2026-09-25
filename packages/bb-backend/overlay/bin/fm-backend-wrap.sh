@@ -263,6 +263,26 @@ fm_backend_wait_transition() {
   esac
 }
 
+fm_backend_commit_transition() {
+  local backend=$1
+  shift
+  fm_backend_source "$backend" || return 2
+  case "$backend" in
+    bb) fm_backend_bb_commit_transition "$@" ;;
+    *) return 2 ;;
+  esac
+}
+
+fm_backend_clear_transition() {
+  local backend=$1
+  shift
+  fm_backend_source "$backend" || return 2
+  case "$backend" in
+    bb) fm_backend_bb_clear_transition "$@" ;;
+    *) return 2 ;;
+  esac
+}
+
 fm_backend_validate_task_endpoint() {
   local meta=$1 id=$2 backend window worktree project binding
   [ -f "$meta" ] && [ ! -L "$meta" ] || {

@@ -23,6 +23,10 @@ import {
   mobileTreeDrawerHidden,
   needsDecisionRailLine,
 } from "./lib/fleet-ui";
+import {
+  INBOX_FILTER_LABELS,
+  type InboxKindFilter,
+} from "./lib/fleet-inbox-filters";
 
 type Tab = "fleet" | "inbox" | "board" | "homes";
 
@@ -158,6 +162,95 @@ function BoardLane({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function CrewSpawnBar({
+  homeId,
+  rpc,
+  onSpawned,
+}: {
+  homeId: string;
+  rpc: ReturnType<typeof useRpc<typeof rpcContract>>;
+  onSpawned: () => void;
+}) {
+  const [label, setLabel] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [role, setRole] = useState<"ship" | "scout">("ship");
+  const [profileId, setProfileId] = useState<string>("");
+  const [profiles, setProfiles] = useState<{ id: string; label: string }[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    rpc
+      .call("listProfiles", { homeId })
+      .then((result) => setProfiles(result.profiles))
+      .catch(() => setProfiles([]));
+  }, [homeId, rpc]);
+
+  return (
+    <div className="mb-3 space-y-2 rounded-md border border-border p-2">
+      <p className="text-xs font-medium text-muted-foreground">Spawn crew</p>
+      <input
+        className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
+        placeholder="Label (task id)"
+        value={label}
+        onChange={(event) => setLabel(event.target.value)}
+      />
+      <textarea
+        className="min-h-[60px] w-full rounded border border-input bg-background px-2 py-1 text-sm"
+        placeholder="Prompt / launch brief"
+        value={prompt}
+        onChange={(event) => setPrompt(event.target.value)}
+      />
+      <div className="flex flex-wrap gap-2">
+        <select
+          className="rounded border border-input bg-background px-2 py-1 text-sm"
+          value={role}
+          onChange={(event) =>
+            setRole(event.target.value === "scout" ? "scout" : "ship")
+          }
+        >
+          <option value="ship">ship</option>
+          <option value="scout">scout</option>
+        </select>
+        <select
+          className="min-w-[140px] flex-1 rounded border border-input bg-background px-2 py-1 text-sm"
+          value={profileId}
+          onChange={(event) => setProfileId(event.target.value)}
+        >
+          <option value="">Default profile</option>
+          {profiles.map((profile) => (
+            <option key={profile.id} value={profile.id}>
+              {profile.label}
+            </option>
+          ))}
+        </select>
+        <Button
+          size="sm"
+          disabled={busy || !label.trim() || !prompt.trim()}
+          onClick={() => {
+            setBusy(true);
+            void rpc
+              .call("spawnCrew", {
+                homeId,
+                label: label.trim(),
+                role,
+                prompt: prompt.trim(),
+                profileId: profileId || undefined,
+              })
+              .then(() => {
+                setLabel("");
+                setPrompt("");
+                onSpawned();
+              })
+              .finally(() => setBusy(false));
+          }}
+        >
+          Spawn
+        </Button>
+      </div>
     </div>
   );
 }
@@ -499,6 +592,7 @@ function FleetPage({ subPath }: { subPath?: string }) {
   const [tab, setTab] = useState<Tab>("fleet");
   const [error, setError] = useState<string | null>(null);
   const [treeOpen, setTreeOpen] = useState(false);
+  const [inboxKind, setInboxKind] = useState<InboxKindFilter>("all");
 
   const refetch = useCallback(() => {
     rpc
@@ -522,10 +616,10 @@ function FleetPage({ subPath }: { subPath?: string }) {
       }
       rpc.call("getTree", { homeId }).then((result) => setTree(result.tree));
       rpc
-        .call("listInbox", { homeId, state: "open" })
+        .call("listInbox", { homeId, state: "open", kind: inboxKind })
         .then((result) => setInbox(result.items));
     },
-    [rpc],
+    [rpc, inboxKind],
   );
 
   useEffect(() => {
@@ -664,6 +758,18 @@ function FleetPage({ subPath }: { subPath?: string }) {
         </div>
       ) : tab === "inbox" ? (
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="mb-2 flex flex-wrap gap-1">
+            {(Object.keys(INBOX_FILTER_LABELS) as InboxKindFilter[]).map((kind) => (
+              <Button
+                key={kind}
+                size="sm"
+                variant={inboxKind === kind ? "secondary" : "ghost"}
+                onClick={() => setInboxKind(kind)}
+              >
+                {INBOX_FILTER_LABELS[kind]}
+              </Button>
+            ))}
+          </div>
           <InboxList
             items={inbox}
             onOpen={selectThread}
@@ -704,6 +810,11 @@ function FleetPage({ subPath }: { subPath?: string }) {
               !treeOpen && mobileTreeDrawerHidden(treeOpen),
             )}
           >
+            <CrewSpawnBar
+              homeId={selectedHomeId}
+              rpc={rpc}
+              onSpawned={() => refetchHome(selectedHomeId)}
+            />
             {tree.length === 0 ? (
               <p className="px-2 py-4 text-sm text-muted-foreground">
                 No crews yet. Spawn ship or scout crews from the mate thread.
