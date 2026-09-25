@@ -176,9 +176,10 @@ function InboxList({
   onReply: (threadId: string, steerText: string) => void | Promise<void>;
 }) {
   const [replyItemId, setReplyItemId] = useState<string | null>(null);
-  const [replyComment, setReplyComment] = useState("");
-  const [replyBusy, setReplyBusy] = useState(false);
-  const [replyError, setReplyError] = useState<string | null>(null);
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [replyErrors, setReplyErrors] = useState<Record<string, string>>({});
+  const [replyBusyItemId, setReplyBusyItemId] = useState<string | null>(null);
+  const replyBusy = replyBusyItemId !== null;
 
   if (items.length === 0) {
     return (
@@ -206,10 +207,9 @@ function InboxList({
               <Button
                 size="sm"
                 variant="ghost"
+                disabled={replyBusy && replyBusyItemId !== item.id}
                 onClick={() => {
                   setReplyItemId(item.id);
-                  setReplyComment("");
-                  setReplyError(null);
                 }}
               >
                 Reply
@@ -233,25 +233,37 @@ function InboxList({
               className="mt-3 flex flex-col gap-2 border-t border-border pt-3"
               onSubmit={(event) => {
                 event.preventDefault();
+                const itemId = item.id;
+                const comment = replyDrafts[itemId] ?? "";
                 const steerText = inboxReplySteerText({
                   title: item.title,
                   body: item.body,
-                  comment: replyComment,
+                  comment,
                 });
                 if (!steerText) return;
                 void (async () => {
-                  setReplyBusy(true);
-                  setReplyError(null);
+                  setReplyBusyItemId(itemId);
+                  setReplyErrors((prev) => {
+                    const next = { ...prev };
+                    delete next[itemId];
+                    return next;
+                  });
                   try {
                     await onReply(item.threadId, steerText);
-                    setReplyItemId(null);
-                    setReplyComment("");
+                    setReplyDrafts((prev) => {
+                      const next = { ...prev };
+                      delete next[itemId];
+                      return next;
+                    });
+                    setReplyItemId((openId) => (openId === itemId ? null : openId));
                   } catch (cause: unknown) {
-                    setReplyError(
-                      cause instanceof Error ? cause.message : String(cause),
-                    );
+                    const message =
+                      cause instanceof Error ? cause.message : String(cause);
+                    setReplyErrors((prev) => ({ ...prev, [itemId]: message }));
                   } finally {
-                    setReplyBusy(false);
+                    setReplyBusyItemId((busyId) =>
+                      busyId === itemId ? null : busyId,
+                    );
                   }
                 })();
               }}
@@ -262,21 +274,27 @@ function InboxList({
               <textarea
                 className="min-h-[80px] w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
                 placeholder="What should the crew do?"
-                value={replyComment}
-                onChange={(event) => setReplyComment(event.target.value)}
-                disabled={replyBusy}
+                value={replyDrafts[item.id] ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setReplyDrafts((prev) => ({ ...prev, [item.id]: value }));
+                }}
+                disabled={replyBusyItemId === item.id}
                 autoFocus
               />
-              {replyError ? (
+              {replyErrors[item.id] ? (
                 <p className="text-xs text-destructive" role="alert">
-                  {replyError}
+                  {replyErrors[item.id]}
                 </p>
               ) : null}
               <div className="flex gap-2">
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={replyBusy || !replyComment.trim()}
+                  disabled={
+                    replyBusyItemId === item.id ||
+                    !(replyDrafts[item.id] ?? "").trim()
+                  }
                 >
                   Send steer
                 </Button>
@@ -284,11 +302,19 @@ function InboxList({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  disabled={replyBusy}
+                  disabled={replyBusyItemId === item.id}
                   onClick={() => {
                     setReplyItemId(null);
-                    setReplyComment("");
-                    setReplyError(null);
+                    setReplyDrafts((prev) => {
+                      const next = { ...prev };
+                      delete next[item.id];
+                      return next;
+                    });
+                    setReplyErrors((prev) => {
+                      const next = { ...prev };
+                      delete next[item.id];
+                      return next;
+                    });
                   }}
                 >
                   Cancel
