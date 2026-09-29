@@ -176,12 +176,51 @@ export class FleetService {
   private async resolveCrewExecution(
     profile?: { providerId?: string | null; model?: string | null },
   ): Promise<MateDefaults> {
+    const defaults = await this.readMateDefaults();
     const providerId = profile?.providerId?.trim();
     const model = profile?.model?.trim();
     if (providerId && model) {
       return { providerId, model };
     }
-    return this.readMateDefaults();
+    if (model) {
+      return { providerId: providerId || defaults.providerId, model };
+    }
+    if (providerId) {
+      return { providerId, model: defaults.model };
+    }
+    return defaults;
+  }
+
+  private crewProjectIdKvKey(threadId: string): string {
+    return `fleet.crewProjectId.${threadId}`;
+  }
+
+  private async readPersistedCrewProjectId(
+    threadId: string,
+  ): Promise<string | null> {
+    const kv = this.bb.storage?.kv;
+    if (!kv) return null;
+    const stored = await kv.get<string>(this.crewProjectIdKvKey(threadId));
+    const trimmed = stored?.trim();
+    return trimmed || null;
+  }
+
+  private async persistCrewProjectId(
+    threadId: string,
+    projectId: string,
+  ): Promise<void> {
+    const kv = this.bb.storage?.kv;
+    if (!kv) return;
+    await kv.set(this.crewProjectIdKvKey(threadId), projectId);
+  }
+
+  private async copyPersistedCrewProjectId(
+    fromThreadId: string,
+    toThreadId: string,
+  ): Promise<void> {
+    const projectId = await this.readPersistedCrewProjectId(fromThreadId);
+    if (!projectId) return;
+    await this.persistCrewProjectId(toThreadId, projectId);
   }
 
   async writeMateDefaults(input: MateDefaults): Promise<MateDefaults> {
@@ -1630,8 +1669,11 @@ export class FleetService {
           .find((p) => p.id === node.dispatchProfileId)
       : undefined;
     const execution = await this.resolveCrewExecution(profile);
+    const relaunchProjectId =
+      (await this.readPersistedCrewProjectId(threadId)) ??
+      mateThread.projectId;
     const thread = await this.bb.sdk.threads.spawn({
-      projectId: mateThread.projectId,
+      projectId: relaunchProjectId,
       parentThreadId: mateThread.id,
       environment: await this.resolveCrewSpawnEnvironment(node, home),
       prompt: text,
@@ -1646,6 +1688,7 @@ export class FleetService {
         relaunchOf: threadId,
       },
     });
+    await this.copyPersistedCrewProjectId(threadId, thread.id);
     await this.updateTaskMetaThreadIdForHome(
       homeId,
       node.label,
@@ -1906,6 +1949,9 @@ export class FleetService {
         yolo: input.yolo ?? false,
       },
     });
+    if (shipProjectId) {
+      await this.persistCrewProjectId(thread.id, crewProjectId);
+    }
     try {
       await this.bb.sdk.threads.send({
         threadId: thread.id,
