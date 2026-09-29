@@ -1,23 +1,22 @@
 # Changelog
 
-All notable changes to this project are documented here. Version numbers follow [SemVer](https://semver.org/).
+Notable changes are listed here. Versions follow [Limitless Enterprise CalVer](https://github.com/Limitless-Enterprise/guidelines/blob/main/docs/05-technology/03-calver-versioning.md) (`YYYY.MM.MICRO`, Git tag `vYYYY.MM.MICRO`). See [docs/VERSIONING.md](./docs/VERSIONING.md).
 
 ## [Unreleased]
 
 ### Added
 
-- Publishing docs (`docs/PUBLISHING.md`, marketplace draft entry, `PLUGIN_OVERVIEW.md`).
-- CI workflow and `scripts/release-check.sh`.
+- CalVer alignment with org guidelines; publishing docs and CI.
 
-## [0.1.0] - TBD
+## [2026.9.0] - TBD
 
-Initial public release: Firstmate Fleet control plane (mate homes, `bb fleet` CLI, Fleet panel, Firstmate integration overlay, M1 capability set).
+First public BB plugin release: Firstmate Fleet control plane (mate homes, `bb fleet` CLI, Fleet panel, Firstmate integration overlay, M1 capability set).
 
-Install (after `v0.1.0` tag exists):
+Install (after `v2026.9.0` tag exists):
 
 ```sh
-bb plugin install git:github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane@^0.1.0 --yes
+bb plugin install git:github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane@^2026.9.0 --yes
 ```
 
-[Unreleased]: https://github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane/compare/v2026.9.0...HEAD
+[2026.9.0]: https://github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane/releases/tag/v2026.9.0

@@ -23,4 +23,4 @@ The plugin registers a **Fleet** nav panel, a `bb fleet` command tree, backgroun
 - **Optional on mate worktrees** — `bb` and `jq` on PATH for overlay backend wrap (documented in the overlay README).
 - **GitHub** — PR poller features need reachable GitHub metadata for linked PRs; other fleet features work without it.
 
-Install from Git (semver tag) or a local path; the install pipeline runs `bb plugin build` for git sources when needed.
+Install from Git using CalVer tags (`vYYYY.MM.MICRO`) or a local path; the install pipeline runs `bb plugin build` for git sources when needed. See [docs/VERSIONING.md](./docs/VERSIONING.md).

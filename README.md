@@ -10,7 +10,7 @@ BB-native **Firstmate Fleet** control plane: mate homes, crew threads (ship / sc
 | **CLI** | `bb fleet` |
 | **Panel** | Fleet (sidebar) |
 
-Store listing copy for the BB Community marketplace lives in [`PLUGIN_OVERVIEW.md`](./PLUGIN_OVERVIEW.md). Maintainers: see [`docs/PUBLISHING.md`](./docs/PUBLISHING.md) before tagging or submitting.
+Store listing copy for the BB Community marketplace lives in [`PLUGIN_OVERVIEW.md`](./PLUGIN_OVERVIEW.md). Versioning: [CalVer (Limitless Enterprise)](./docs/VERSIONING.md). Maintainers: see [`docs/PUBLISHING.md`](./docs/PUBLISHING.md) before tagging or submitting.
 
 ## Requirements
 
@@ -28,10 +28,10 @@ Optional CLI tools on mate worktrees after integration apply: `bb`, `jq` (see ov
 
 ### From Git (recommended for end users)
 
-After a release tag exists (for example `v0.1.0`):
+After a stable release tag exists (CalVer, for example `v2026.9.0`):
 
 ```sh
-bb plugin install git:github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane@^0.1.0 --yes
+bb plugin install git:github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane@^2026.9.0 --yes
 ```
 
 Track `main` before the first tag:

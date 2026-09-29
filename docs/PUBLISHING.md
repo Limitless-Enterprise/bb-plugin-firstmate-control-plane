@@ -30,29 +30,34 @@ Optional full gate:
 
 Confirm:
 
-- [ ] `CHANGELOG.md` updated for the release version
-- [ ] `package.json` `version` bumped
+- [ ] `CHANGELOG.md` updated for the release CalVer
+- [ ] `package.json` `version` set to the intended stable CalVer (see [VERSIONING.md](./VERSIONING.md))
 - [ ] `PLUGIN_OVERVIEW.md` matches `bb.description` and current surfaces
 - [ ] GitHub repo public; no secrets in tree
 - [ ] `git-id` (or correct org identity) for release commits
 
 ## Git release (preferred source)
 
-BB managed installs use **semver tags** on the default branch:
+Versioning follows [Limitless Enterprise CalVer](https://github.com/Limitless-Enterprise/guidelines/blob/main/docs/05-technology/03-calver-versioning.md). See [VERSIONING.md](./VERSIONING.md) for this repo.
+
+1. Pick the next stable `YYYY.MM.MICRO` (UTC month, increment `MICRO` within the month).
+2. Set `package.json` `version` to that value and update `CHANGELOG.md`.
+3. Run `./scripts/release-check.sh`.
+4. Tag and push (immutable; never move tags):
 
 ```sh
-git tag -a v0.1.0 -m "Release v0.1.0"
+git tag -a v2026.9.0 -m "Release 2026.9.0"
 git push origin main
-git push origin v0.1.0
+git push origin v2026.9.0
 ```
 
-Users install with:
+Users install with a range over CalVer tags (BB resolves `vYYYY.MM.MICRO` tags):
 
 ```sh
-bb plugin install git:github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane@^0.1.0 --yes
+bb plugin install git:github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane@^2026.9.0 --yes
 ```
 
-Do **not** move an existing tag; publish fixes as `v0.1.1`, etc.
+Do **not** move an existing tag. Hotfixes and follow-up releases use the next stable CalVer (for example `2026.9.1`, then `2026.10.0` in a new UTC month).
 
 ## BB Community marketplace
 
@@ -73,4 +78,4 @@ To list the plugin on an internal marketplace, host `marketplace.json` and point
 
 ## npm release (optional)
 
-Git installs can build from source. npm distribution requires a **prebuilt `dist/`** in the published tarball. Prefer Git semver releases unless you already publish npm packages for BB plugins.
+Git installs can build from source. npm distribution requires a **prebuilt `dist/`** in the published tarball. Prefer Git CalVer tags unless you already publish npm packages for BB plugins; npm accepts the canonical `YYYY.MM.MICRO` form per org guidelines.

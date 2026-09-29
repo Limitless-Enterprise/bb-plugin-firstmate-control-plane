@@ -3,6 +3,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+echo "==> CalVer (package.json)"
+node scripts/validate-calver-version.mjs package.json
+
 echo "==> plugin id"
 node scripts/derive-plugin-id.mjs package.json
 
