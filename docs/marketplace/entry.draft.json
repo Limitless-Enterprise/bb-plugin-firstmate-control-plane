@@ -1,0 +1,21 @@
+{
+  "id": "firstmate-control-plane",
+  "displayName": "Firstmate Fleet",
+  "description": "Coordinate mate homes and crew threads from BB with inbox triage, liveness, supervision, and a Fleet sidebar panel. Run `bb fleet integration apply` on each Firstmate checkout so delegated work appears in the tree. Requires BB and a Firstmate worktree per mate home.",
+  "icon": { "url": "./icons/firstmate-control-plane.svg" },
+  "screenshots": [],
+  "overview": "./overview/firstmate-control-plane.md",
+  "tags": ["firstmate", "fleet", "agents", "supervision", "inbox"],
+  "author": {
+    "name": "Limitless Enterprise",
+    "github": "Limitless-Enterprise",
+    "url": "https://github.com/Limitless-Enterprise"
+  },
+  "category": "agents-and-providers",
+  "source": {
+    "git": {
+      "url": "https://github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane.git",
+      "range": "^0.1.0"
+    }
+  }
+}

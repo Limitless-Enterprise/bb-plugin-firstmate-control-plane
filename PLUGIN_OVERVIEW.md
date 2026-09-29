@@ -1,21 +1,26 @@
-Keep a todo list beside the work it belongs to, in the sidebar and in
-your agent threads.
+## Run a mate-led fleet inside BB
+
+Use **Fleet** to register **mate homes** (Firstmate checkouts), watch crew threads move through a semantic state machine, triage **Fleet Inbox** (holds, wakes, liveness, stalls, PR signals), and steer or relaunch work from the sidebar panel or `bb fleet` CLI.
 
 ## What you get
 
-- An **Example todos** page in the left sidebar that adds, completes, and
-  removes todos.
-- A `bb firstmate-control-plane` command that does the same from a terminal.
-- Live updates, so a change made in one place reaches every open page at once.
+- **Mate homes** — bootstrap or attach a Firstmate worktree per home; switch homes from the Fleet header.
+- **Crew tree + chat** — ship, scout, and secondmate child threads with status dots, thread chat, and overflow actions (interrupt, exit, relaunch, detach).
+- **Inbox** — filter by kind, resolve, snooze, or reply with a required steer comment.
+- **Board** — columns by FSM state (working, blocked, idle, done, failed).
+- **CLI** — `bb fleet spawn`, `steer`, `digest`, `integration apply`, holds, sweep, and related commands.
+
+Crew threads are created when the mate delegates work (including via the Firstmate integration overlay); the panel does not expose a manual spawn form.
 
 ## How it works
 
-The todos live in this plugin's own storage on the BB server, one list per
-installation. Nothing leaves the machine, and the plugin needs no account, API
-key, or external service.
+The plugin registers a **Fleet** nav panel, a `bb fleet` command tree, background services (supervisor, PR poller, status bridge), and SQLite-backed fleet state. Applying **Firstmate integration** copies a portable overlay into each mate checkout under `.bb-integration/` so native Firstmate dispatch can route through `bb fleet spawn` and appear in the tree.
 
-## For agents
+## Requirements
 
-The bundled skill tells an agent to read the list with `bb firstmate-control-plane list`, add
-one todo at a time with `bb firstmate-control-plane add`, and close finished work with
-`bb firstmate-control-plane done`.
+- **BB** `>= 0.43` and a compatible `@get-bb/plugin-sdk` (see `engines` in `package.json`).
+- **Firstmate** — a git checkout per mate home; run `bb fleet integration apply --mate <homeId>` after install or upgrade.
+- **Optional on mate worktrees** — `bb` and `jq` on PATH for overlay backend wrap (documented in the overlay README).
+- **GitHub** — PR poller features need reachable GitHub metadata for linked PRs; other fleet features work without it.
+
+Install from Git (semver tag) or a local path; the install pipeline runs `bb plugin build` for git sources when needed.

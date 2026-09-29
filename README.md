@@ -4,6 +4,14 @@ BB-native **Firstmate Fleet** control plane: mate homes, crew threads (ship / sc
 
 **Repository:** [github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane](https://github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane)
 
+| | |
+| --- | --- |
+| **BB plugin id** | `firstmate-control-plane` |
+| **CLI** | `bb fleet` |
+| **Panel** | Fleet (sidebar) |
+
+Store listing copy for the BB Community marketplace lives in [`PLUGIN_OVERVIEW.md`](./PLUGIN_OVERVIEW.md). Maintainers: see [`docs/PUBLISHING.md`](./docs/PUBLISHING.md) before tagging or submitting.
+
 ## Requirements
 
 | Dependency | Version |
@@ -18,7 +26,23 @@ Optional CLI tools on mate worktrees after integration apply: `bb`, `jq` (see ov
 
 ## Installation
 
-### From source (path install)
+### From Git (recommended for end users)
+
+After a release tag exists (for example `v0.1.0`):
+
+```sh
+bb plugin install git:github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane@^0.1.0 --yes
+```
+
+Track `main` before the first tag:
+
+```sh
+bb plugin install git:github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane@main --yes
+```
+
+BB validates `engines.bb` / `engines.bbPluginSdk`, builds the plugin from source when needed, and records the resolved commit.
+
+### From source (path install, development)
 
 ```sh
 git clone https://github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane.git
@@ -34,7 +58,7 @@ Verify:
 bb plugin list | rg firstmate-control-plane
 ```
 
-The plugin id is **`firstmate-control-plane`**. Path installs load UI from this repo’s `dist/` after each `bb plugin build .`.
+Path installs load UI from this repo’s `dist/` after each `bb plugin build .`.
 
 ### Reload after updates
 

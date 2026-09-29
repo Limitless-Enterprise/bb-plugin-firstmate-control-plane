@@ -2,6 +2,19 @@
   "name": "bb-plugin-firstmate-control-plane",
   "version": "0.1.0",
   "license": "Apache-2.0",
+  "description": "BB plugin: Firstmate Fleet control plane (mate homes, crews, inbox, supervision).",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane.git"
+  },
+  "homepage": "https://github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane#readme",
+  "bugs": {
+    "url": "https://github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane/issues"
+  },
+  "author": {
+    "name": "Limitless Enterprise",
+    "url": "https://github.com/Limitless-Enterprise"
+  },
   "type": "module",
   "engines": {
     "bb": ">=0.43",
@@ -13,7 +26,7 @@
   },
   "bb": {
     "name": "Fleet",
-    "description": "Firstmate Fleet control plane — mate homes, crews, liveness, inbox, and supervision.",
+    "description": "Run mate homes and crew threads from BB with inbox, liveness, supervision, and a Fleet panel plus bb fleet control.",
     "branding": {
       "icon": "./assets/icon.svg"
     },
