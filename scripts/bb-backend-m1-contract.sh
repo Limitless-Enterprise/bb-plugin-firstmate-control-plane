@@ -114,4 +114,31 @@ if fm_backend_bb_send_key "@thread:thr_crew" Enter 2>/dev/null; then
   exit 1
 fi
 
+# B-W3: bootstrap calls fm_backend_required_tools from bin/fm-backend.sh (wrap).
+WRAP_TEST_ROOT="$(mktemp -d)"
+mkdir -p "$WRAP_TEST_ROOT/.bb-integration/native/bin"
+cat >"$WRAP_TEST_ROOT/.bb-integration/native/bin/fm-backend-native.sh" <<'NAT'
+fm_backend_required_tools() {
+  case "$1" in
+    tmux) printf '%s' 'tmux treehouse' ;;
+    *) return 1 ;;
+  esac
+}
+fm_backend_validate_task_endpoint() { return 0; }
+NAT
+FM_ROOT_OVERRIDE="$WRAP_TEST_ROOT" bash -c "
+  set -eu
+  # shellcheck source=/dev/null
+  . \"$OVERLAY/bin/fm-backend-wrap.sh\"
+  tools=\$(fm_backend_required_tools bb) || exit 2
+  [ \"\$tools\" = 'bb jq' ] || exit 3
+  fm_backend_required_tools bogus >/dev/null 2>&1 && exit 4
+  exit 0
+" || {
+  echo "B-W3: fm_backend_required_tools bb should return 'bb jq'" >&2
+  rm -rf "$WRAP_TEST_ROOT"
+  exit 1
+}
+rm -rf "$WRAP_TEST_ROOT"
+
 echo "bb-backend M1 contract checks passed"

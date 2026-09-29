@@ -29,6 +29,7 @@ import {
 } from "./status-verbs";
 import { wakeIdsToAckThrough } from "./fleet-bridge-helpers";
 import {
+  DEFAULT_MATE_DEFAULTS,
   MATE_DEFAULTS_KV_KEY,
   normalizeMateDefaults,
   type MateDefaults,
@@ -163,10 +164,24 @@ export class FleetService {
   }
 
   async readMateDefaults(): Promise<MateDefaults> {
-    const stored = await this.bb.storage.kv.get<Partial<MateDefaults>>(
-      MATE_DEFAULTS_KV_KEY,
-    );
+    const kv = this.bb.storage?.kv;
+    if (!kv) {
+      return DEFAULT_MATE_DEFAULTS;
+    }
+    const stored = await kv.get<Partial<MateDefaults>>(MATE_DEFAULTS_KV_KEY);
     return normalizeMateDefaults(stored);
+  }
+
+  /** Provider/model for crew spawns when no dispatch profile overrides. */
+  private async resolveCrewExecution(
+    profile?: { providerId?: string | null; model?: string | null },
+  ): Promise<MateDefaults> {
+    const providerId = profile?.providerId?.trim();
+    const model = profile?.model?.trim();
+    if (providerId && model) {
+      return { providerId, model };
+    }
+    return this.readMateDefaults();
   }
 
   async writeMateDefaults(input: MateDefaults): Promise<MateDefaults> {
@@ -1614,16 +1629,15 @@ export class FleetService {
           .listProfiles(homeId)
           .find((p) => p.id === node.dispatchProfileId)
       : undefined;
+    const execution = await this.resolveCrewExecution(profile);
     const thread = await this.bb.sdk.threads.spawn({
       projectId: mateThread.projectId,
       parentThreadId: mateThread.id,
       environment: await this.resolveCrewSpawnEnvironment(node, home),
       prompt: text,
       title: `${role}: ${node.label}`,
-      ...(profile?.model ? { model: profile.model } : {}),
-      ...(profile?.providerId && profile.model
-        ? { providerId: profile.providerId }
-        : {}),
+      providerId: execution.providerId,
+      model: execution.model,
       pluginMetadata: {
         fleetHomeId: homeId,
         fleetRole: role,
@@ -1851,6 +1865,7 @@ export class FleetService {
     prompt: string;
     parentId?: string | null;
     projectId?: string | null;
+    shipProjectId?: string | null;
     profileId?: string | null;
     deliveryMode?: "no-mistakes" | "direct-PR" | "local-only";
     yolo?: boolean;
@@ -1869,7 +1884,10 @@ export class FleetService {
     const mateThread = await this.bb.sdk.threads.get({
       threadId: home.mateThreadId,
     });
-    const crewProjectId = mateThread.projectId ?? projectId;
+    const shipProjectId = input.shipProjectId?.trim() ?? "";
+    const crewProjectId =
+      shipProjectId || mateThread.projectId || (await this.resolveProjectId(input.projectId));
+    const execution = await this.resolveCrewExecution(profile);
     const thread = await this.bb.sdk.threads.spawn({
       projectId: crewProjectId,
       parentThreadId: mateThread.id,
@@ -1879,10 +1897,8 @@ export class FleetService {
       }),
       prompt: input.prompt,
       title: `${input.role}: ${input.label}`,
-      ...(profile?.model ? { model: profile.model } : {}),
-      ...(profile?.providerId && profile.model
-        ? { providerId: profile.providerId }
-        : {}),
+      providerId: execution.providerId,
+      model: execution.model,
       pluginMetadata: {
         fleetHomeId: input.homeId,
         fleetRole: input.role,

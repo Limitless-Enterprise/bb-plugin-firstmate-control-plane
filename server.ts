@@ -1063,6 +1063,7 @@ export default async function plugin(bb: BbPluginApi) {
             const prompt = flags.get("prompt");
             const modeFlag = flags.get("mode");
             const profileFlag = flags.get("profile");
+            const shipProjectFlag = flags.get("ship-project-id");
             if (
               typeof label !== "string" ||
               (role !== "ship" && role !== "scout") ||
@@ -1085,6 +1086,10 @@ export default async function plugin(bb: BbPluginApi) {
               yolo: flags.has("yolo"),
               profileId:
                 typeof profileFlag === "string" ? profileFlag : undefined,
+              shipProjectId:
+                typeof shipProjectFlag === "string"
+                  ? shipProjectFlag
+                  : undefined,
             });
             const payload = {
               ...node,

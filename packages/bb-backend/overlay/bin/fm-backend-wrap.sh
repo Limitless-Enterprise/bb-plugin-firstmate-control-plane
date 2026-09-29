@@ -21,8 +21,19 @@ eval "$(
   declare -f fm_backend_validate_task_endpoint \
     | sed '1s/fm_backend_validate_task_endpoint/_fm_backend_validate_task_endpoint_native/'
 )"
+eval "$(
+  declare -f fm_backend_required_tools \
+    | sed '1s/fm_backend_required_tools/_fm_backend_required_tools_native/'
+)"
 
 FM_BACKEND_KNOWN="tmux herdr zellij orca cmux bb"
+
+fm_backend_required_tools() {  # <backend>
+  case "$1" in
+    bb) printf '%s' 'bb jq' ;;
+    *) _fm_backend_required_tools_native "$1" ;;
+  esac
+}
 
 fm_backend_is_known() {
   case " $FM_BACKEND_KNOWN " in
