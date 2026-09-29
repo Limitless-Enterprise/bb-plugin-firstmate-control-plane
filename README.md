@@ -1,77 +1,160 @@
-# bb-plugin-firstmate-control-plane
+# Firstmate Fleet control plane (BB plugin)
 
-BB-native Firstmate Fleet control plane. Replaces Herdr/tmux semantics with BB child threads, worktree environments, semantic FSM, liveness probes, Fleet Inbox, and multi Mate homes.
+BB-native **Firstmate Fleet** control plane: mate homes, crew threads (ship / scout / secondmate), semantic FSM, liveness, Fleet Inbox, supervision, and a Fleet sidebar panel. Crew work runs as BB child threads with worktree environments instead of external process managers.
 
-## Install
+**Repository:** [github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane](https://github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane)
+
+## Requirements
+
+| Dependency | Version |
+| --- | --- |
+| [BB](https://github.com/get-bb/bb) | `>= 0.43` (see `package.json` `engines.bb`) |
+| `@get-bb/plugin-sdk` | `>= 0.4.104` (dev dependency; resolved at build) |
+| Node.js | LTS recommended |
+| pnpm | `10.13.1` (pinned via `packageManager` in `package.json`) |
+| Firstmate checkout | One git worktree per **mate home** (see [Firstmate integration](#firstmate-integration)) |
+
+Optional CLI tools on mate worktrees after integration apply: `bb`, `jq` (see overlay backend wrap).
+
+## Installation
+
+### From source (path install)
 
 ```sh
-cd /workspace/Codes/bb-plugin-firstmate-control-plane
+git clone https://github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane.git
+cd bb-plugin-firstmate-control-plane
 pnpm install
-bb plugin install .
+bb plugin build .
+bb plugin install . --yes
 ```
 
-## CLI
+Verify:
 
 ```sh
-bb fleet home bootstrap cto --label CTO --parent /workspace/Codes
-bb fleet home create cto --label CTO --parent /workspace/Codes --thread <mateThreadId>
-bb fleet spawn --mate cto --role ship --label auth --prompt "Ship the auth fix"
-bb fleet spawn --mate cto --role ship --label auth --prompt "…" --ship-project-id proj-ship
-bb fleet spawn --mate cto --batch-file ./crews.json   # JSON array: label, role, prompt, optional profileId/mode/yolo
-bb fleet tree --mate cto
-bb fleet board --mate cto
-bb fleet inbox --mate cto [--limit 100]
-bb fleet digest --mate cto --tell-cos
-bb fleet bearings --mate cto
-bb fleet steer --mate cto --thread <threadId> --text "Continue on the PR feedback"
-bb fleet interrupt|exit|relaunch|detach --mate cto --thread <threadId>
-bb fleet hold open|list|resolve --mate cto --thread <threadId> ...
-bb fleet sweep --mate cto
-bb fleet profiles --mate cto
-bb fleet integration apply --mate cto
-bb fleet integration check --mate cto
+bb plugin list | rg firstmate-control-plane
 ```
 
-## Panel
+The plugin id is **`firstmate-control-plane`**. Path installs load UI from this repo’s `dist/` after each `bb plugin build .`.
 
-Open **Fleet** in the BB sidebar (`/plugins/firstmate-control-plane/fleet`): home
-switcher, tree + ThreadChat (mobile tree toggle; empty tree shows mate-dispatch
-guidance — no manual spawn form), Inbox (kind filters; resolve, snooze, **Reply**
-composer — required steer comment; title/body are context only), status board, and
-crew overflow controls (interrupt, exit, relaunch, detach). Deep links:
-`/fleet/inbox`, `/fleet/board`, `/fleet/homes`, `/fleet/thread/<threadId>`.
-
-## Implementation plan
-
-See [docs/IMPLEMENTATION_PLAN.md](./docs/IMPLEMENTATION_PLAN.md) and [docs/CAPABILITY_INVENTORY.md](./docs/CAPABILITY_INVENTORY.md).
-
-## M1 acceptance
-
-M1 is complete when every **M1 ✓** row in [docs/CAPABILITY_INVENTORY.md](./docs/CAPABILITY_INVENTORY.md) is **✅** and `./scripts/m1-inventory-gate.sh` passes. After build, plugin install, and `bb fleet integration apply --mate <homeId>`:
+### Reload after updates
 
 ```sh
-export FM_HOME=/path/to/firstmate-tech
-export MATE=tech
-./scripts/m1-ac-full.sh          # fast smoke (24 checks; not sufficient alone)
-./scripts/m1-inventory-gate.sh # pnpm test (lib + overlay/spawn contract scripts), typecheck, inventory scan
+git pull
+pnpm install   # when lockfile changed
+bb plugin build .
+bb plugin reload firstmate-control-plane
 ```
 
-See [docs/M1_ACCEPTANCE_MATRIX.md](./docs/M1_ACCEPTANCE_MATRIX.md) and [docs/IMPLEMENTATION_PLAN.md §8](./docs/IMPLEMENTATION_PLAN.md#8-m1-acceptance-criteria-inventory-authoritative).
+## Quick start
 
-## Contracts
+1. **Bootstrap a mate home** (creates/links Firstmate checkout + primary mate thread):
 
-See [contracts/README.md](./contracts/README.md) (also [contracts.md](./contracts.md) at repo root during migration).
+   ```sh
+   bb fleet home bootstrap <homeId> --label "My mate" --parent /path/to/parent-dir
+   ```
 
-## Firstmate BB integration overlay
+2. **Apply Firstmate integration** in that checkout (overlay + `bb fleet spawn` routing):
 
-After cloning Firstmate for a mate home, the plugin applies a portable overlay under
-`.bb-integration/` in the checkout. This keeps native Firstmate CLI behavior while
-routing crew dispatch through `bb fleet spawn` so workers appear in the Fleet UI.
+   ```sh
+   bb fleet integration apply --mate <homeId>
+   bb fleet integration check --mate <homeId>
+   ```
+
+3. Open **Fleet** in the BB sidebar (Ship icon). Select your home, use **Tree + Chat**, **Inbox**, or **Board**.
+
+Crew threads are created when the **mate** delegates work (CLI / spawn skill / `bb fleet spawn`); the panel does not include a manual “spawn crew” form.
+
+## Usage
+
+### Fleet panel
+
+Route prefix: plugin panel **`fleet`** (deep links below).
+
+| Area | What it does |
+| --- | --- |
+| **Tree + Chat** | Mate/crew tree, thread chat, steer; overflow: interrupt, exit, relaunch, detach |
+| **Inbox** | Holds, wakes, liveness, stalls, PR signals — resolve, snooze, reply-with-steer |
+| **Board** | Columns by FSM state (working, blocked, idle, done, failed) |
+| **Homes** | Create/select mate homes |
+
+Deep links (sub-path): `inbox`, `board`, `homes`, `thread/<threadId>`.
+
+### CLI (`bb fleet`)
 
 ```sh
-bb fleet integration apply --mate tech
-bb fleet integration check --mate tech
+# Homes
+bb fleet home bootstrap <homeId> --label <label> --parent <dir>
+bb fleet home create <homeId> --label <label> --parent <dir> --thread <mateThreadId>
+
+# Crew dispatch (also used by mate integration)
+bb fleet spawn --mate <homeId> --role ship|scout|secondmate --label <name> --prompt "<task>"
+bb fleet spawn --mate <homeId> --role ship --label auth --prompt "…" --ship-project-id <projectId>
+bb fleet spawn --mate <homeId> --batch-file ./crews.json
+
+# Observability
+bb fleet tree --mate <homeId>
+bb fleet board --mate <homeId>
+bb fleet inbox --mate <homeId> [--limit 100]
+bb fleet digest --mate <homeId> --tell-cos
+bb fleet bearings --mate <homeId>
+
+# Control
+bb fleet steer --mate <homeId> --thread <threadId> --text "Continue on the PR feedback"
+bb fleet interrupt|exit|relaunch|detach --mate <homeId> --thread <threadId>
+bb fleet hold open|list|resolve --mate <homeId> --thread <threadId> ...
+bb fleet sweep --mate <homeId>
+bb fleet profiles --mate <homeId>
+
+# Integration
+bb fleet integration apply --mate <homeId>
+bb fleet integration check --mate <homeId>
 ```
 
-See [packages/bb-backend/overlay/README.md](./packages/bb-backend/overlay/README.md)
-(install layout) and [integration/README.md](./integration/README.md) (quick start).
+Batch file shape: JSON array of objects with `label`, `role`, `prompt`, and optional `profileId`, `mode`, `yolo`.
+
+### Firstmate integration
+
+After cloning Firstmate for a mate home, the plugin writes a portable overlay under `.bb-integration/` in that checkout so native Firstmate flows can route crew dispatch through `bb fleet spawn` and appear in the Fleet UI.
+
+- Overlay layout: [packages/bb-backend/overlay/README.md](./packages/bb-backend/overlay/README.md)
+- Quick start: [integration/README.md](./integration/README.md)
+
+Re-run **`bb fleet integration apply --mate <homeId>`** after upgrading this plugin when overlay files change.
+
+## Development
+
+```sh
+pnpm run typecheck
+pnpm test                    # unit tests + contract scripts
+./scripts/m1-inventory-gate.sh   # full M1 gate (tests + inventory scan)
+```
+
+Docs:
+
+- [docs/IMPLEMENTATION_PLAN.md](./docs/IMPLEMENTATION_PLAN.md)
+- [docs/CAPABILITY_INVENTORY.md](./docs/CAPABILITY_INVENTORY.md)
+- [docs/M1_ACCEPTANCE_MATRIX.md](./docs/M1_ACCEPTANCE_MATRIX.md)
+- [contracts/README.md](./contracts/README.md)
+
+Live acceptance (against a real mate home):
+
+```sh
+export FM_HOME=/path/to/firstmate-checkout
+export MATE=<homeId>
+./scripts/m1-ac-full.sh
+```
+
+## Architecture (short)
+
+- **Plugin server** (`server.ts`): RPC for panel, SQLite fleet state, background services (supervisor, PR poller, status bridge).
+- **Panel** (`app.tsx`): React UI registered on BB `navPanel` slot `fleet`.
+- **CLI**: `bb fleet` command registered by the plugin.
+- **Overlay**: Optional Firstmate backend wrap under `packages/bb-backend/overlay/` applied into mate checkouts.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](./LICENSE).
+
+## Contributing
+
+Issues and pull requests are welcome on GitHub. For large changes, open an issue first to align on scope. Run `pnpm test` and `./scripts/m1-inventory-gate.sh` before submitting PRs that touch fleet behavior.
