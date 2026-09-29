@@ -25,7 +25,7 @@ integration version **3**).
       fm-teardown.sh           # pristine upstream backup
 bin/
   fm-spawn.sh              # → fm-spawn-wrap.sh (when backend=bb)
-  fm-backend.sh            # → fm-backend-wrap.sh (adds bb backend)
+  fm-backend.sh            # → fm-backend-wrap.sh (adds bb backend + B-W3: bb/jq required tools)
   fm-teardown.sh           # → fm-teardown-wrap.sh (BB-aware treehouse skip)
   backends/bb.sh           # bb adapter copy
 bin/fm-control-lib.sh      # patched at apply: bb backend Escape|C-c interrupt

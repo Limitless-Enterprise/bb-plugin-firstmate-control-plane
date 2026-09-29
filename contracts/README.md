@@ -69,6 +69,19 @@ profiles:
 }
 ```
 
+## Crew spawn (`bb fleet spawn`)
+
+- The Fleet panel does not expose a manual spawn form; an empty tree shows
+  mate-dispatch guidance. Crews appear when the mate checkout runs native
+  `fm-spawn` (overlay → `bb fleet spawn`) or when an operator uses CLI.
+- `threads.spawn` uses mate default `providerId` and `model` from plugin settings
+  when no profile applies. `--profile <id>` selects a home dispatch profile;
+  model-only or provider-only profiles merge with mate defaults (not full substitution).
+- `--ship-project-id <bbProjectId>` sets the BB project for the crew thread, stores
+  `fleet.crewProjectId.<threadId>` in plugin KV, and `bb fleet relaunch` reuses that
+  project for the replacement spawn.
+- `--mode`, `--yolo`, and `--batch-file` behave as in README CLI examples.
+
 ## Status ledger entry (append-only)
 
 ```ts

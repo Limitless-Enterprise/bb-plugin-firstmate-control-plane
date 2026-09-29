@@ -136,7 +136,7 @@ with an operator comment (inbox title/body as context only).
 
 - Dispatch profiles CRUD; spawn override
 - PR/CI poller; mode-aware ready parsing
-- UI profile picker + row chips
+- Dispatch profile chips on tree rows; mate/CLI spawn (no panel spawn form)
 
 **Exit:** Profile A ship + profile B scout; green CI wake.
 

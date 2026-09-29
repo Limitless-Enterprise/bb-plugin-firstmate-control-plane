@@ -222,7 +222,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-U8 | Mobile drawer | ✓ | ✅ |
 | P-U9 | Realtime refresh | ✓ | ✅ |
 | P-U10 | Fleet settings | ✓ | ✅ |
-| P-U11 | Spawn UI profile picker | ✓ | ✅ |
+| P-U11 | Tree empty state (mate dispatch; no panel spawn) | ✓ | ✅ |
 | P-U12 | Overflow interrupt/exit/relaunch | ✓ | ✅ |
 | P-U13 | Composer steer in panel | ✓ | ✅ |
 | P-U14 | Nav badges (inbox/wakes/dead) | ✓ | ✅ |

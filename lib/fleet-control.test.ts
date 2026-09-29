@@ -28,12 +28,14 @@ const CREW: FleetNode = {
   createdAtMs: 1,
 };
 
-function controlFleet() {
+function controlFleet(options?: { kv?: Map<string, unknown> }) {
   const events: string[] = [];
   const ledger: { verb: string; threadId: string }[] = [];
   const liveness: { threadId: string; verdict: string; detail: Record<string, unknown> }[] =
     [];
   let crewThreadId = CREW.threadId;
+  let lastSpawnProjectId: string | undefined;
+  const kv = options?.kv ?? new Map<string, unknown>();
 
   const store = {
     getHome: () => HOME,
@@ -78,7 +80,8 @@ function controlFleet() {
           stop: async ({ threadId }: { threadId: string }) => {
             events.push(`stop:${threadId}`);
           },
-          spawn: async () => {
+          spawn: async (input: { projectId: string }) => {
+            lastSpawnProjectId = input.projectId;
             events.push("spawn:thr_new");
             return { id: "thr_new", environmentId: "env-new" };
           },
@@ -88,13 +91,33 @@ function controlFleet() {
           create: async () => ({ id: "env-new", path: "/wt" }),
         },
       },
+      storage: {
+        kv: {
+          get: async <T>(key: string) => (kv.get(key) as T | undefined) ?? null,
+          set: async (key: string, value: unknown) => {
+            kv.set(key, value);
+          },
+        },
+      },
       log: { warn: () => {} },
       realtime: { publish: () => {} },
     } as never,
     store as never,
   );
 
-  return { fleet, events, ledger, liveness, get crewThreadId() { return crewThreadId; } };
+  return {
+    fleet,
+    events,
+    ledger,
+    liveness,
+    kv,
+    get crewThreadId() {
+      return crewThreadId;
+    },
+    get lastSpawnProjectId() {
+      return lastSpawnProjectId;
+    },
+  };
 }
 
 describe("exitThread (B-C2)", () => {
@@ -119,5 +142,15 @@ describe("relaunch (B-C3)", () => {
         (row) => row.verb === "control.relaunch" && row.threadId === "thr_new",
       ),
     );
+  });
+
+  it("relaunch uses persisted ship project id over mate project", async () => {
+    const kv = new Map<string, unknown>([
+      ["fleet.crewProjectId.thr_crew", "proj-ship"],
+    ]);
+    const ctx = controlFleet({ kv });
+    await ctx.fleet.relaunch("tech", "thr_crew", "continue work");
+    assert.equal(ctx.lastSpawnProjectId, "proj-ship");
+    assert.equal(kv.get("fleet.crewProjectId.thr_new"), "proj-ship");
   });
 });

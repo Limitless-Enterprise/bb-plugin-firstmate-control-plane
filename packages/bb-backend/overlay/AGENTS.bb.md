@@ -15,6 +15,8 @@ still work; crews run as BB child threads and appear in the **Fleet** panel.
 
 Use **`bin/fm-spawn.sh`** as documented in AGENTS.md. Ship/scout crews call
 `bb fleet spawn` and write durable `state/<task>.meta` with `backend=bb`.
+With `config/backend=bb`, fm-bootstrap requires **`bb`** and **`jq`** on PATH
+(via `fm_backend_required_tools` in the installed `bin/fm-backend.sh` wrap).
 
 Unsupported until M3: `--secondmate` (still uses the native backend).
 

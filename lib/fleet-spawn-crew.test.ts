@@ -148,6 +148,214 @@ describe("spawnCrew launch brief (B-S3)", () => {
     assert.equal(spawnProjectId, "proj-1");
   });
 
+  it("uses mate default provider/model when no dispatch profile", async () => {
+    let spawnExecution: { providerId?: string; model?: string } = {};
+    const kv = new Map<string, unknown>();
+    const fleet = new FleetService(
+      {
+        sdk: {
+          projects: { list: async () => [{ id: "proj-1", kind: "standard" }] },
+          hosts: { list: async () => [{ id: "host-1" }] },
+          environments: {
+            create: async () => ({ id: "env-1", path: "/wt" }),
+          },
+          threads: {
+            get: async () => ({ id: "thr_mate", projectId: "proj-1" }),
+            spawn: async (input: { providerId?: string; model?: string }) => {
+              spawnExecution = {
+                providerId: input.providerId,
+                model: input.model,
+              };
+              return { id: "thr_spawned", environmentId: "env-1" };
+            },
+            send: async () => {},
+            stop: async () => {},
+            archive: async () => {},
+          },
+        },
+        storage: {
+          kv: {
+            get: async <T>(key: string) => (kv.get(key) as T | undefined) ?? null,
+            set: async (key: string, value: unknown) => {
+              kv.set(key, value);
+            },
+          },
+        },
+        log: { warn: () => {} },
+        realtime: { publish: () => {} },
+      } as never,
+      {
+        getHome: () => HOME,
+        listProfiles: () => [],
+        getNode: (id: string) => (id === "mate-1" ? PRIMARY : undefined),
+        getNodeByThread: () => undefined,
+        appendLedger: () => {},
+        insertNode: (input: Omit<FleetNode, "id" | "createdAtMs">) => ({
+          ...input,
+          id: "n-new",
+          createdAtMs: 1,
+        }),
+      } as never,
+    );
+    await fleet.writeMateDefaults({
+      providerId: "anthropic",
+      model: "claude-mate",
+    });
+    await fleet.spawnCrew({
+      homeId: "tech",
+      label: "alpha",
+      role: "ship",
+      prompt: "work",
+    });
+    assert.deepEqual(spawnExecution, {
+      providerId: "anthropic",
+      model: "claude-mate",
+    });
+  });
+
+  it("merges model-only dispatch profile with mate default provider", async () => {
+    let spawnExecution: { providerId?: string; model?: string } = {};
+    const kv = new Map<string, unknown>();
+    const nodes = new Map<string, FleetNode>([["mate-1", { ...PRIMARY }]]);
+    const fleet = new FleetService(
+      {
+        sdk: {
+          projects: { list: async () => [{ id: "proj-1", kind: "standard" }] },
+          hosts: { list: async () => [{ id: "host-1" }] },
+          environments: {
+            create: async () => ({ id: "env-1", path: "/wt" }),
+          },
+          threads: {
+            get: async () => ({ id: "thr_mate", projectId: "proj-1" }),
+            spawn: async (input: { providerId?: string; model?: string }) => {
+              spawnExecution = {
+                providerId: input.providerId,
+                model: input.model,
+              };
+              return { id: "thr_spawned", environmentId: "env-1" };
+            },
+            send: async () => {},
+            stop: async () => {},
+            archive: async () => {},
+          },
+        },
+        storage: {
+          kv: {
+            get: async <T>(key: string) => (kv.get(key) as T | undefined) ?? null,
+            set: async (key: string, value: unknown) => {
+              kv.set(key, value);
+            },
+          },
+        },
+        log: { warn: () => {} },
+        realtime: { publish: () => {} },
+      } as never,
+      {
+        getHome: () => HOME,
+        listProfiles: () => [
+          {
+            id: "prof-partial",
+            homeId: "tech",
+            label: "Custom model",
+            providerId: null,
+            model: "custom-model",
+            effort: null,
+            taskClasses: [],
+          },
+        ],
+        getNode: (id: string) => nodes.get(id),
+        getNodeByThread: () => undefined,
+        appendLedger: () => {},
+        insertNode: (input: Omit<FleetNode, "id" | "createdAtMs">) => {
+          const node: FleetNode = {
+            ...input,
+            id: "n-new",
+            createdAtMs: 1,
+          };
+          nodes.set(node.id, node);
+          return node;
+        },
+      } as never,
+    );
+    await fleet.writeMateDefaults({
+      providerId: "openai",
+      model: "gpt-mate-default",
+    });
+    await fleet.spawnCrew({
+      homeId: "tech",
+      label: "alpha",
+      role: "ship",
+      prompt: "work",
+      profileId: "prof-partial",
+    });
+    assert.deepEqual(spawnExecution, {
+      providerId: "openai",
+      model: "custom-model",
+    });
+  });
+
+  it("uses shipProjectId for spawn project and persists kv for relaunch", async () => {
+    let spawnProjectId: string | undefined;
+    const kv = new Map<string, unknown>();
+    const fleet = new FleetService(
+      {
+        sdk: {
+          projects: {
+            list: async () => [
+              { id: "proj-1", kind: "standard" },
+              { id: "proj-ship", kind: "standard" },
+            ],
+          },
+          hosts: { list: async () => [{ id: "host-1" }] },
+          environments: {
+            create: async () => ({ id: "env-1", path: "/wt" }),
+          },
+          threads: {
+            get: async () => ({ id: "thr_mate", projectId: "proj-1" }),
+            spawn: async (input: { projectId: string }) => {
+              spawnProjectId = input.projectId;
+              return { id: "thr_spawned", environmentId: "env-1" };
+            },
+            send: async () => {},
+            stop: async () => {},
+            archive: async () => {},
+          },
+        },
+        storage: {
+          kv: {
+            get: async <T>(key: string) => (kv.get(key) as T | undefined) ?? null,
+            set: async (key: string, value: unknown) => {
+              kv.set(key, value);
+            },
+          },
+        },
+        log: { warn: () => {} },
+        realtime: { publish: () => {} },
+      } as never,
+      {
+        getHome: () => HOME,
+        listProfiles: () => [],
+        getNode: (id: string) => (id === "mate-1" ? PRIMARY : undefined),
+        getNodeByThread: () => undefined,
+        appendLedger: () => {},
+        insertNode: (input: Omit<FleetNode, "id" | "createdAtMs">) => ({
+          ...input,
+          id: "n-new",
+          createdAtMs: 1,
+        }),
+      } as never,
+    );
+    await fleet.spawnCrew({
+      homeId: "tech",
+      label: "alpha",
+      role: "ship",
+      prompt: "work",
+      shipProjectId: "proj-ship",
+    });
+    assert.equal(spawnProjectId, "proj-ship");
+    assert.equal(kv.get("fleet.crewProjectId.thr_spawned"), "proj-ship");
+  });
+
   it("uses home default dispatch profile when profileId omitted (P-D4)", async () => {
     let spawnModel: string | undefined;
     const nodes = new Map<string, FleetNode>([

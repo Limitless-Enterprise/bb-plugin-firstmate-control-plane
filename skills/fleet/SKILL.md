@@ -10,8 +10,13 @@ bb fleet home bootstrap cto --label CTO --parent /workspace/Codes
 
 ## Spawn crew (worktree child thread)
 
+Crews are spawned by the mate thread (`fm-spawn` → `bb fleet spawn`) or by operators
+via CLI — not from a Fleet panel spawn form. Spawns use mate default provider/model
+and home dispatch profiles (`--profile`); partial profiles merge with mate defaults.
+
 ```sh
 bb fleet spawn --mate cto --role ship --label auth --prompt "Ship the auth fix"
+bb fleet spawn --mate cto --role ship --label auth --prompt "…" --ship-project-id proj-ship
 ```
 
 ## Lead secondmate (M3)
@@ -35,7 +40,8 @@ bb fleet secondmate create --mate cto --thread <threadId> --label platform-lead
 - `bb fleet bearings --mate cto` — CoS bearings snapshot
 - `bb fleet integration apply|check --mate cto` — overlay install/verify
 
-Open the **Fleet** panel in BB for tree + chat (mobile tree toggle), inbox
-(resolve, snooze, Reply composer with required steer comment — see
+Open the **Fleet** panel in BB for tree + chat (mobile tree toggle; mate-dispatch
+guidance when the tree is empty), inbox (resolve, snooze, Reply composer with
+required steer comment — see
 [contracts/README.md](../../contracts/README.md#fleet-inbox-item)), status board, and
 crew overflow controls.
