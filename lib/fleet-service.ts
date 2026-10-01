@@ -1144,7 +1144,22 @@ export class FleetService {
         } catch {
           // may already be stopped
         }
-        await this.archiveBbThread(previousMateThreadId);
+        try {
+          await this.archiveBbThread(previousMateThreadId);
+        } catch (archiveError) {
+          let nowArchived = false;
+          try {
+            const previousMate = await this.bb.sdk.threads.get({
+              threadId: previousMateThreadId,
+            });
+            nowArchived = isBbThreadArchived(previousMate);
+          } catch {
+            // still unknown
+          }
+          if (!nowArchived) {
+            throw archiveError;
+          }
+        }
       }
     } catch (error) {
       await this.discardBbMateThread(thread.id);
@@ -1163,10 +1178,13 @@ export class FleetService {
         throw new Error(`Home "${homeId}" not found after mate reset.`);
       }
     } catch (error) {
-      await this.discardBbMateThread(thread.id);
+      const discarded = await this.discardBbMateThread(thread.id);
       const detail = error instanceof Error ? error.message : String(error);
+      const discardNote = discarded
+        ? "Spawned replacement was discarded."
+        : `Spawned replacement (${thread.id}) may still be live in BB; discard archive failed.`;
       throw new Error(
-        `Mate reset failed after archiving previous mate (${previousMateThreadId}); home still references that archived thread. Spawned replacement was discarded. ${detail}`,
+        `Mate reset failed after archiving previous mate (${previousMateThreadId}); home still references that archived thread. ${discardNote} ${detail}`,
       );
     }
 
@@ -1957,17 +1975,19 @@ export class FleetService {
     return true;
   }
 
-  private async discardBbMateThread(threadId: string): Promise<void> {
+  private async discardBbMateThread(threadId: string): Promise<boolean> {
     try {
       await this.bb.sdk.threads.stop({ threadId });
     } catch {
       // may already be stopped
     }
-    if (isLegacyFleetThreadId(threadId)) return;
+    if (isLegacyFleetThreadId(threadId)) return true;
     try {
       await this.bb.sdk.threads.archive({ threadId });
+      return true;
     } catch (error) {
       this.bb.log.warn(`fleet: discard BB thread ${threadId} failed: ${error}`);
+      return false;
     }
   }
 

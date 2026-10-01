@@ -79,7 +79,9 @@ function mateResetFleet(options: {
   threadsGet?: (threadId: string) => Promise<{ id: string; projectId: string; archivedAt?: number | null }>;
   threadsGetThrows?: Set<string>;
   spawnFails?: boolean;
+  archivePreviousMateFails?: boolean;
 }) {
+  const previousMateGetAttempts = new Map<string, number>();
   const bbEvents: string[] = [];
   let home = { ...options.home };
   const nodes = [...options.nodes];
@@ -115,7 +117,9 @@ function mateResetFleet(options: {
         projects: { list: async () => [{ id: "proj-1", kind: "standard" }] },
         threads: {
           get: async ({ threadId }: { threadId: string }) => {
-            if (options.threadsGetThrows?.has(threadId)) {
+            const attempts = (previousMateGetAttempts.get(threadId) ?? 0) + 1;
+            previousMateGetAttempts.set(threadId, attempts);
+            if (options.threadsGetThrows?.has(threadId) && attempts === 1) {
               throw new Error(`lookup failed: ${threadId}`);
             }
             if (options.threadsGet) {
@@ -139,6 +143,12 @@ function mateResetFleet(options: {
           },
           archive: async ({ threadId }: { threadId: string }) => {
             bbEvents.push(`archive:${threadId}`);
+            if (
+              options.archivePreviousMateFails &&
+              threadId === "thr_mate_old"
+            ) {
+              throw new Error("already archived");
+            }
           },
         },
       },
@@ -274,6 +284,36 @@ describe("resetMateThread", () => {
     await assert.rejects(() => fleet.resetMateThread("tech"), /spawn failed/);
     assert.ok(!bbEvents.some((e) => e.startsWith("archive:")));
     assert.ok(!bbEvents.some((e) => e.startsWith("stop:")));
+  });
+
+  it("completes retry when previous mate get fails once but mate is already archived", async () => {
+    const checkoutPath = await minimalGitCheckout();
+    const home = { ...BASE_HOME, checkoutPath };
+    let previousMateGets = 0;
+    const { fleet, bbEvents, getHome } = mateResetFleet({
+      home,
+      nodes: [{ ...PRIMARY, threadId: "thr_mate_old" }],
+      archivePreviousMateFails: true,
+      threadsGet: async (threadId) => {
+        if (threadId !== "thr_mate_old") {
+          return { id: threadId, projectId: "proj-1", archivedAt: null };
+        }
+        previousMateGets += 1;
+        if (previousMateGets === 1) {
+          return { id: threadId, projectId: "proj-1", archivedAt: null };
+        }
+        if (previousMateGets === 2) {
+          throw new Error("transient lookup");
+        }
+        return { id: threadId, projectId: "proj-1", archivedAt: Date.now() };
+      },
+    });
+
+    const result = await fleet.resetMateThread("tech");
+    assert.equal(result.mateThreadId, "thr_mate_new");
+    assert.equal(getHome().mateThreadId, "thr_mate_new");
+    assert.ok(bbEvents.includes("spawn"));
+    assert.ok(!bbEvents.includes("archive:thr_mate_new"));
   });
 
   it("rejects reset when open child crews remain", async () => {
