@@ -9,6 +9,7 @@ if ! bb_path="$(bash "$root/scripts/resolve-bb-cli.sh")"; then
 fi
 
 export BB_CLI="$bb_path"
+export PATH="$(dirname "$bb_path"):${PATH:-}"
 export MATE="${MATE:-tech}"
 export FM_HOME="${FM_HOME:-/workspace/firstmates/firstmate-${MATE}}"
 export RUN_META_DETACH="${RUN_META_DETACH:-1}"

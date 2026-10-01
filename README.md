@@ -168,6 +168,16 @@ export MATE=<homeId>
 ./scripts/m1-ac-full.sh
 ```
 
+Mate reset and meta close-out RPC checks (running BB + installed plugin; same transport as Fleet Tree UI):
+
+```sh
+export MATE=<homeId>
+export FM_HOME=/path/to/firstmate-checkout
+export BB_CLI=bb   # or rely on scripts/resolve-bb-cli.sh
+./scripts/p-u19-live-rpc.sh
+# Optional destructive mate reset: EXECUTE_MATE_RESET=1 ./scripts/p-u19-live-rpc.sh
+```
+
 ## Architecture (short)
 
 - **Plugin server** (`server.ts`): RPC for panel, SQLite fleet state, background services (supervisor, PR poller, status bridge).
