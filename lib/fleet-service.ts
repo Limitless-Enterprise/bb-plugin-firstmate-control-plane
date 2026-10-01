@@ -1125,22 +1125,37 @@ export class FleetService {
     });
 
     try {
-      await this.bb.sdk.threads.stop({ threadId: previousMateThreadId });
-    } catch {
-      // may already be stopped
+      try {
+        await this.bb.sdk.threads.stop({ threadId: previousMateThreadId });
+      } catch {
+        // may already be stopped
+      }
+      await this.archiveBbThread(previousMateThreadId);
+    } catch (error) {
+      await this.discardBbMateThread(thread.id);
+      throw error;
     }
-    await this.archiveBbThread(previousMateThreadId);
 
-    await this.ensureBbIntegration({
-      homeId,
-      mateThreadId: thread.id,
-      checkoutPath: home.checkoutPath,
-    });
+    try {
+      await this.ensureBbIntegration({
+        homeId,
+        mateThreadId: thread.id,
+        checkoutPath: home.checkoutPath,
+      });
 
-    const updated = this.updateHome(homeId, { mateThreadId: thread.id });
-    if (!updated) {
-      throw new Error(`Home "${homeId}" not found after mate reset.`);
+      const updated = this.updateHome(homeId, { mateThreadId: thread.id });
+      if (!updated) {
+        throw new Error(`Home "${homeId}" not found after mate reset.`);
+      }
+    } catch (error) {
+      await this.discardBbMateThread(thread.id);
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Mate reset failed after archiving previous mate (${previousMateThreadId}); home still references that archived thread. Spawned replacement was discarded. ${detail}`,
+      );
     }
+
+    const updated = this.store.getHome(homeId)!;
 
     this.store.appendLedger({
       homeId,
@@ -1903,7 +1918,7 @@ export class FleetService {
   }
 
   /** BB→Fleet close-out (P-SYNC-1): resolve holds, clear inbox/wakes, remove node. */
-  closeOutRegistryForArchivedThread(threadId: string): boolean {
+  async closeOutRegistryForArchivedThread(threadId: string): Promise<boolean> {
     const node = this.store.getNodeByThread(threadId);
     if (!node || node.kind === "primary") return false;
     const resolvedHoldIds: string[] = [];
@@ -1921,10 +1936,24 @@ export class FleetService {
       fsmState: "stopped",
       detail: { source: "bb.thread.archived" },
     });
+    await this.markTaskMetaFleetDetachedForHome(node.homeId, node.label);
     this.store.deleteNode(node.id);
-    void this.markTaskMetaFleetDetachedForHome(node.homeId, node.label);
     this.publish();
     return true;
+  }
+
+  private async discardBbMateThread(threadId: string): Promise<void> {
+    try {
+      await this.bb.sdk.threads.stop({ threadId });
+    } catch {
+      // may already be stopped
+    }
+    if (isLegacyFleetThreadId(threadId)) return;
+    try {
+      await this.bb.sdk.threads.archive({ threadId });
+    } catch (error) {
+      this.bb.log.warn(`fleet: discard BB thread ${threadId} failed: ${error}`);
+    }
   }
 
   async archiveBbThread(threadId: string): Promise<void> {
@@ -2044,7 +2073,7 @@ export class FleetService {
           });
           continue;
         }
-        if (this.closeOutRegistryForArchivedThread(node.threadId)) {
+        if (await this.closeOutRegistryForArchivedThread(node.threadId)) {
           removed.push({ threadId: node.threadId, label: node.label });
         }
         continue;

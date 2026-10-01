@@ -383,7 +383,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.events.on("thread.archived", async (event) => {
     const threadId = event.thread.id;
-    fleet.closeOutRegistryForArchivedThread(threadId);
+    await fleet.closeOutRegistryForArchivedThread(threadId);
   });
 
   bb.events.on("thread.idle", async (event) => {
