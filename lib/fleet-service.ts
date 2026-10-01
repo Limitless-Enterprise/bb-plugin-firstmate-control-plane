@@ -715,12 +715,16 @@ export class FleetService {
     taskId: string,
   ): Promise<void> {
     const metaPath = path.join(checkoutPath, "state", `${taskId}.meta`);
+    let meta: string;
     try {
-      const meta = await fs.readFile(metaPath, "utf8");
-      await fs.writeFile(metaPath, appendMetaFleetDetached(meta), "utf8");
-    } catch {
-      // no meta for this task
+      meta = await fs.readFile(metaPath, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return;
+      }
+      throw error;
     }
+    await fs.writeFile(metaPath, appendMetaFleetDetached(meta), "utf8");
   }
 
   async markTaskMetaFleetDetachedForHome(
@@ -1125,12 +1129,23 @@ export class FleetService {
     });
 
     try {
+      let previousAlreadyArchived = false;
       try {
-        await this.bb.sdk.threads.stop({ threadId: previousMateThreadId });
+        const previousMate = await this.bb.sdk.threads.get({
+          threadId: previousMateThreadId,
+        });
+        previousAlreadyArchived = isBbThreadArchived(previousMate);
       } catch {
-        // may already be stopped
+        // proceed with stop/archive
       }
-      await this.archiveBbThread(previousMateThreadId);
+      if (!previousAlreadyArchived) {
+        try {
+          await this.bb.sdk.threads.stop({ threadId: previousMateThreadId });
+        } catch {
+          // may already be stopped
+        }
+        await this.archiveBbThread(previousMateThreadId);
+      }
     } catch (error) {
       await this.discardBbMateThread(thread.id);
       throw error;
