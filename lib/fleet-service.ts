@@ -18,6 +18,12 @@ import {
   pathIsGitCheckout,
 } from "./firstmate-checkout";
 import {
+  formatOpenChildBlockMessage,
+  isBbThreadArchived,
+  openChildBlockersFromNodes,
+  type OpenChildBlocker,
+} from "./mate-thread-reset";
+import {
   mateEnvironmentPath,
   resolveMateCheckoutPaths,
   resolveMateStateRoot,
@@ -40,6 +46,7 @@ import type {
   FleetNode,
   FsmState,
   HoldKind,
+  Home,
   LivenessVerdict,
   TreeNode,
 } from "./types";
@@ -989,6 +996,121 @@ export class FleetService {
       throw new Error(`Home "${homeId}" not found.`);
     }
     this.publish();
+  }
+
+  async resolveOpenChildBlockers(homeId: string): Promise<OpenChildBlocker[]> {
+    this.assertHome(homeId);
+    const nodes = this.store.listNodes(homeId).filter((n) => n.kind !== "primary");
+    const archivedByThreadId = new Map<string, boolean>();
+    for (const node of nodes) {
+      if (archivedByThreadId.has(node.threadId)) continue;
+      try {
+        const thread = await this.bb.sdk.threads.get({
+          threadId: node.threadId,
+        });
+        archivedByThreadId.set(node.threadId, isBbThreadArchived(thread));
+      } catch {
+        archivedByThreadId.set(node.threadId, true);
+      }
+    }
+    return openChildBlockersFromNodes(
+      this.store.listNodes(homeId),
+      archivedByThreadId,
+    );
+  }
+
+  async resetMateThreadPreflight(homeId: string): Promise<{
+    allowed: boolean;
+    openChildren: OpenChildBlocker[];
+    mateThreadId: string;
+    mateLabel: string;
+  }> {
+    this.assertHome(homeId);
+    const home = this.store.getHome(homeId)!;
+    const openChildren = await this.resolveOpenChildBlockers(homeId);
+    return {
+      allowed: openChildren.length === 0,
+      openChildren,
+      mateThreadId: home.mateThreadId,
+      mateLabel: home.label,
+    };
+  }
+
+  async resetMateThread(
+    homeId: string,
+    input?: { prompt?: string },
+  ): Promise<{
+    home: Home;
+    previousMateThreadId: string;
+    mateThreadId: string;
+  }> {
+    this.assertHome(homeId);
+    const home = this.store.getHome(homeId)!;
+    const openChildren = await this.resolveOpenChildBlockers(homeId);
+    if (openChildren.length > 0) {
+      throw new Error(formatOpenChildBlockMessage(openChildren));
+    }
+
+    const previousMateThreadId = home.mateThreadId;
+    let oldMateProjectId: string;
+    try {
+      const oldMate = await this.bb.sdk.threads.get({
+        threadId: previousMateThreadId,
+      });
+      oldMateProjectId = oldMate.projectId;
+    } catch {
+      oldMateProjectId = await this.ensureHomeProject({
+        homeId,
+        label: home.label,
+        checkoutPath: home.checkoutPath,
+      });
+    }
+
+    try {
+      await this.bb.sdk.threads.stop({ threadId: previousMateThreadId });
+    } catch {
+      // may already be stopped
+    }
+    await this.archiveBbThread(previousMateThreadId);
+
+    const mateExecution = await this.readMateDefaults();
+    const thread = await this.bb.sdk.threads.spawn({
+      projectId: oldMateProjectId,
+      environment: { type: "project-default" },
+      providerId: mateExecution.providerId,
+      model: mateExecution.model,
+      prompt:
+        input?.prompt?.trim() ||
+        matePromptWithBbIntegration({ label: home.label, homeId }),
+      title: `${home.label} mate`,
+      pluginMetadata: { fleetHomeId: homeId, fleetRole: "primary" },
+    });
+
+    const updated = this.updateHome(homeId, { mateThreadId: thread.id });
+    if (!updated) {
+      throw new Error(`Home "${homeId}" not found after mate reset.`);
+    }
+
+    await this.ensureBbIntegration({
+      homeId,
+      mateThreadId: thread.id,
+      checkoutPath: updated.checkoutPath,
+    });
+
+    this.store.appendLedger({
+      homeId,
+      threadId: previousMateThreadId,
+      verb: "control.exit",
+      fsmState: "stopped",
+      detail: { reason: "mate.reset", replacedBy: thread.id },
+    });
+
+    this.publish();
+    return {
+      home: updated,
+      previousMateThreadId,
+      mateThreadId: thread.id,
+    };
   }
 
   async registerHome(input: {
