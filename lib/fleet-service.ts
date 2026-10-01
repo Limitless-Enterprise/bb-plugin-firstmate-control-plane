@@ -1129,15 +1129,9 @@ export class FleetService {
     });
 
     try {
-      let previousAlreadyArchived = false;
-      try {
-        const previousMate = await this.bb.sdk.threads.get({
-          threadId: previousMateThreadId,
-        });
-        previousAlreadyArchived = isBbThreadArchived(previousMate);
-      } catch {
-        // proceed with stop/archive
-      }
+      let previousAlreadyArchived = await this.probeBbThreadArchived(
+        previousMateThreadId,
+      );
       if (!previousAlreadyArchived) {
         try {
           await this.bb.sdk.threads.stop({ threadId: previousMateThreadId });
@@ -1147,23 +1141,24 @@ export class FleetService {
         try {
           await this.archiveBbThread(previousMateThreadId);
         } catch (archiveError) {
-          let nowArchived = false;
-          try {
-            const previousMate = await this.bb.sdk.threads.get({
-              threadId: previousMateThreadId,
-            });
-            nowArchived = isBbThreadArchived(previousMate);
-          } catch {
-            // still unknown
-          }
-          if (!nowArchived) {
+          if (!(await this.probeBbThreadArchived(previousMateThreadId))) {
             throw archiveError;
           }
         }
       }
     } catch (error) {
-      await this.discardBbMateThread(thread.id);
-      throw error;
+      if (await this.probeBbThreadArchived(previousMateThreadId)) {
+        // previous mate is archived; continue with integration
+      } else {
+        const discarded = await this.discardBbMateThread(thread.id);
+        const detail = error instanceof Error ? error.message : String(error);
+        if (!discarded) {
+          throw new Error(
+            `Mate reset failed while archiving previous mate (${previousMateThreadId}). Spawned replacement (${thread.id}) may still be live in BB; discard archive failed. ${detail}`,
+          );
+        }
+        throw error;
+      }
     }
 
     try {
@@ -1973,6 +1968,21 @@ export class FleetService {
     this.store.deleteNode(node.id);
     this.publish();
     return true;
+  }
+
+  private async probeBbThreadArchived(
+    threadId: string,
+    maxAttempts = 3,
+  ): Promise<boolean> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const mate = await this.bb.sdk.threads.get({ threadId });
+        return isBbThreadArchived(mate);
+      } catch {
+        // retry transient lookup failures
+      }
+    }
+    return false;
   }
 
   private async discardBbMateThread(threadId: string): Promise<boolean> {
