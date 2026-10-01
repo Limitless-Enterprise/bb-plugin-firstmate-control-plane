@@ -1056,7 +1056,7 @@ export class FleetService {
         });
         archivedByThreadId.set(node.threadId, isBbThreadArchived(thread));
       } catch {
-        archivedByThreadId.set(node.threadId, true);
+        archivedByThreadId.set(node.threadId, false);
       }
     }
     return openChildBlockersFromNodes(
@@ -1082,10 +1082,7 @@ export class FleetService {
     };
   }
 
-  async resetMateThread(
-    homeId: string,
-    input?: { prompt?: string },
-  ): Promise<{
+  async resetMateThread(homeId: string): Promise<{
     home: Home;
     previousMateThreadId: string;
     mateThreadId: string;
@@ -1125,9 +1122,7 @@ export class FleetService {
       environment: { type: "project-default" },
       providerId: mateExecution.providerId,
       model: mateExecution.model,
-      prompt:
-        input?.prompt?.trim() ||
-        matePromptWithBbIntegration({ label: home.label, homeId }),
+      prompt: matePromptWithBbIntegration({ label: home.label, homeId }),
       title: `${home.label} mate`,
       pluginMetadata: { fleetHomeId: homeId, fleetRole: "primary" },
     });

@@ -242,8 +242,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
     resetMateThreadPreflight: async (input) =>
       await fleet.resetMateThreadPreflight(input.homeId),
-    resetMateThread: async (input) =>
-      await fleet.resetMateThread(input.homeId, { prompt: input.prompt }),
+    resetMateThread: async (input) => await fleet.resetMateThread(input.homeId),
     listThreadCandidates: async (input) => ({
       threads: await fleet.listThreadCandidates(input?.limit ?? 40),
     }),
@@ -844,7 +843,6 @@ export default async function plugin(bb: BbPluginApi) {
     "Usage:",
     "  bb fleet status [--mate <homeId>] [--json]",
     "  bb fleet home bootstrap <homeId> --label <name> [--parent <dir>]",
-    "  bb fleet home reset-mate [<homeId>]  # archive mate thread, spawn fresh (no open crews)",
     "  bb fleet home create <homeId> --label <name> --thread <threadId> [--parent <dir>] [--checkout <path>]",
     "  bb fleet home list [--json]",
     "  bb fleet home select <homeId>",
@@ -993,14 +991,6 @@ export default async function plugin(bb: BbPluginApi) {
                 mateThreadId: thread,
               });
               return reply(home, `Registered home ${home.homeId}`);
-            }
-            if (sub === "reset-mate") {
-              const targetId = rest[0] ? resolveHomeId(rest[0]) : homeId();
-              const result = await fleet.resetMateThread(targetId);
-              return reply(
-                result,
-                `New mate thread ${result.mateThreadId} for ${targetId} (archived ${result.previousMateThreadId})`,
-              );
             }
             break;
           }

@@ -32,9 +32,11 @@ export function MateThreadResetControl({
   } | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [preflightError, setPreflightError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadPreflight = useCallback(() => {
+    setPreflightError(null);
     rpc
       .call("resetMateThreadPreflight", { homeId })
       .then((result) =>
@@ -45,7 +47,9 @@ export function MateThreadResetControl({
       )
       .catch((cause: unknown) => {
         setPreflight(null);
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setPreflightError(
+          cause instanceof Error ? cause.message : String(cause),
+        );
       });
   }, [homeId, rpc]);
 
@@ -93,6 +97,22 @@ export function MateThreadResetControl({
       </Button>
       {blockHint ? (
         <p className="text-[11px] leading-snug text-muted-foreground">{blockHint}</p>
+      ) : null}
+      {preflightError ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[11px] text-destructive" role="alert">
+            {preflightError}
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-auto px-1 py-0 text-[11px]"
+            onClick={() => loadPreflight()}
+          >
+            Retry
+          </Button>
+        </div>
       ) : null}
       {error ? (
         <p className="text-[11px] text-destructive" role="alert">

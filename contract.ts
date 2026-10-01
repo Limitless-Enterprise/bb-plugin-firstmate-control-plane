@@ -125,7 +125,6 @@ export const rpcContract = defineRpcContract({
   resetMateThread: {
     input: z.object({
       homeId: z.string(),
-      prompt: z.string().optional(),
     }),
     output: z.object({
       home: homeSchema,
