@@ -79,6 +79,10 @@ import {
   shouldRetryUnconfirmedSubmit,
   steerInboxTitle,
 } from "./fleet-steer-delivery";
+import {
+  appendMetaFleetDetached,
+  isMetaFleetDetached,
+} from "./fleet-meta-closeout";
 import { DIVERGENCE_LEDGER_VERB } from "./status-divergence";
 
 export const FLEET_CHANGED = "fleet-changed";
@@ -706,6 +710,38 @@ export class FleetService {
     }
   }
 
+  private async markTaskMetaFleetDetached(
+    checkoutPath: string,
+    taskId: string,
+  ): Promise<void> {
+    const metaPath = path.join(checkoutPath, "state", `${taskId}.meta`);
+    try {
+      const meta = await fs.readFile(metaPath, "utf8");
+      await fs.writeFile(metaPath, appendMetaFleetDetached(meta), "utf8");
+    } catch {
+      // no meta for this task
+    }
+  }
+
+  async markTaskMetaFleetDetachedForHome(
+    homeId: string,
+    taskId: string,
+  ): Promise<void> {
+    for (const checkoutPath of await this.mateCheckoutPaths(homeId)) {
+      await this.markTaskMetaFleetDetached(checkoutPath, taskId);
+    }
+  }
+
+  private async isBbThreadOpen(threadId: string): Promise<boolean> {
+    if (isLegacyFleetThreadId(threadId)) return false;
+    try {
+      const thread = await this.bb.sdk.threads.get({ threadId });
+      return !isBbThreadArchived(thread);
+    } catch {
+      return false;
+    }
+  }
+
   async syncCrewsFromStateMeta(
     homeId: string,
     checkoutPaths: string[],
@@ -742,6 +778,10 @@ export class FleetService {
           continue;
         }
 
+        if (isMetaFleetDetached(meta)) {
+          continue;
+        }
+
         const kind = metaField(meta, "kind");
         if (kind !== "ship" && kind !== "scout") continue;
 
@@ -749,6 +789,12 @@ export class FleetService {
         const bbThreadId = metaField(meta, "bb_thread_id");
         const windowThread = metaField(meta, "window")?.match(/^@thread:(.+)$/)?.[1];
         const threadId = bbThreadId || windowThread;
+
+        if (threadId && !isLegacyFleetThreadId(threadId)) {
+          if (!(await this.isBbThreadOpen(threadId))) {
+            continue;
+          }
+        }
 
         let statusPrefix: string | null = null;
         let statusFsm: FsmState | null = null;
@@ -1877,6 +1923,7 @@ export class FleetService {
       detail: { source: "bb.thread.archived" },
     });
     this.store.deleteNode(node.id);
+    void this.markTaskMetaFleetDetachedForHome(node.homeId, node.label);
     this.publish();
     return true;
   }
@@ -1916,6 +1963,7 @@ export class FleetService {
       this.holdIdsForThread(homeId, threadId),
     );
     this.store.deleteNode(node.id);
+    await this.markTaskMetaFleetDetachedForHome(homeId, node.label);
     this.publish();
   }
 
@@ -1935,11 +1983,16 @@ export class FleetService {
 
       let threadMissing = false;
       let threadLookupFailed = false;
+      let threadArchived = false;
       try {
         const thread = await this.bb.sdk.threads.get({
           threadId: node.threadId,
         });
-        if (!thread) threadMissing = true;
+        if (!thread) {
+          threadMissing = true;
+        } else {
+          threadArchived = isBbThreadArchived(thread);
+        }
       } catch {
         threadLookupFailed = true;
       }
@@ -1954,15 +2007,25 @@ export class FleetService {
       }
 
       let metaPresent = false;
+      let metaRaw: string | null = null;
       for (const checkoutPath of checkoutPaths) {
         const metaPath = path.join(checkoutPath, "state", `${node.label}.meta`);
         if (await pathExists(metaPath)) {
           metaPresent = true;
+          try {
+            metaRaw = await fs.readFile(metaPath, "utf8");
+          } catch {
+            metaRaw = null;
+          }
           break;
         }
       }
 
-      if (metaPresent) {
+      if (
+        metaPresent &&
+        (!metaRaw || !isMetaFleetDetached(metaRaw)) &&
+        !threadArchived
+      ) {
         if (threadMissing) {
           skipped.push({
             threadId: node.threadId,
