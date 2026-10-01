@@ -196,7 +196,9 @@ while switching rows; the composer stays open until steer succeeds or shows an e
 - Captain inbox via `bb fleet inbox [--mate <homeId>] [--json] [--limit N]` — JSON
   `{ items, totalOpen, limit }`; default limit 100, max 500.
 - Holds via `bb fleet hold open|list|resolve` (see [Hold](#hold)).
-- Orphan cleanup via `bb fleet sweep [--mate <homeId>] [--json]` — `{ removed, skipped }`.
+- Orphan cleanup via `bb fleet sweep [--mate <homeId>] [--json]` — `{ removed, skipped }`;
+  removes registry crew nodes whose BB thread is archived (or missing with safe
+  meta), including stale nodes left after detach, when no open holds block removal.
 - Dispatch profiles via `bb fleet profiles --mate <homeId>`.
 - Captain attention via **Fleet Inbox** only — not Command Center inbox.
 
@@ -205,7 +207,16 @@ while switching rows; the composer stays open until steer succeeds or shows an e
 `{ inbox, wakes, dead }` for sidebar badges when scoped to a home. `inboxBadge`:
 with a selected home, returns `count` / `wakes` / `dead` from `fleetNavCounts`
 for that home; with no home selected, sums those three fields from
-`fleetNavCounts` across every registered home.
+`fleetNavCounts` across every registered home. **Mate thread reset** (Tree UI only,
+no CLI): `resetMateThreadPreflight` returns `{ allowed, openChildren, mateThreadId,
+mateLabel }` after checking BB archive state for each non-primary node (legacy
+`legacy:*` thread ids are ignored; `threads.get` failure fail-closes as blocking).
+`resetMateThread` spawns the replacement mate, stops/archives the previous mate
+thread (idempotent when the previous mate is already archived), applies integration
+on the new thread, then updates the home; rejects when `openChildren` is
+non-empty. Integration or home-update failures after the previous mate is archived
+roll back the spawned thread and leave the home on the previous mate id until retry
+succeeds.
 
 ## Isolation
 
@@ -240,7 +251,12 @@ via `bb fleet relaunch` or Fleet UI controls. Status bridge resolves mate
 registry and environment checkout paths (`lib/mate-checkout-paths.ts`), scans each
 `state/<id>.status` for `working:`, `done:`, `failed:`,
 `blocked:`, `paused:`, `needs-decision:`, `resolved:`, and `note:` (`note:` appends
-`crew.note` ledger entries; other prefixes map per `lib/status-verbs.ts`).
+`crew.note` ledger entries; other prefixes map per `lib/status-verbs.ts`). Each
+scan also runs `syncCrewsFromStateMeta` (B-S9): register missing ship/scout crews
+from `state/<id>.meta`, skipping meta with `fleet_detached=1` and skipping when
+the linked BB crew thread is archived. Close-out stamps `fleet_detached=1` on task
+meta before registry removal (`detachCrew` before BB archive; BB archive sync
+before `deleteNode`) so stale meta cannot resurrect nodes.
 PR poller watches GitHub checks and PR lifecycle (review, commits, merge retire).
 
 **GitHub webhook (P-P7):** `POST /github/webhook` on the plugin HTTP server.

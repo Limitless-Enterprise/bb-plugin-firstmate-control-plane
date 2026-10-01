@@ -201,17 +201,17 @@ function mockFleetService(
 }
 
 describe("Fleet archive sync (P-SYNC-1)", () => {
-  it("removes crew node when BB archives thread", () => {
+  it("removes crew node when BB archives thread", async () => {
     const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
     const { fleet, ledger, deleted } = mockFleetService(nodes);
-    assert.equal(fleet.closeOutRegistryForArchivedThread("thr_crew"), true);
+    assert.equal(await fleet.closeOutRegistryForArchivedThread("thr_crew"), true);
     assert.deepEqual(deleted, ["n-crew"]);
     assert.equal(ledger[0]?.verb, "thread.archived");
     assert.equal(ledger[0]?.fsmState, "stopped");
     assert.equal(nodes.size, 0);
   });
 
-  it("clears snoozed inbox on BB archive close-out", () => {
+  it("clears snoozed inbox on BB archive close-out", async () => {
     const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
     const { fleet, store } = mockFleetService(nodes);
     const item = store.createInboxItem({
@@ -223,12 +223,12 @@ describe("Fleet archive sync (P-SYNC-1)", () => {
     });
     item.state = "snoozed";
     item.snoozedUntilMs = Date.now() + 3600_000;
-    assert.equal(fleet.closeOutRegistryForArchivedThread("thr_crew"), true);
+    assert.equal(await fleet.closeOutRegistryForArchivedThread("thr_crew"), true);
     assert.equal(item.state, "resolved");
     assert.ok(item.resolvedAtMs != null);
   });
 
-  it("clears open inbox and unacked wakes on BB archive close-out", () => {
+  it("clears open inbox and unacked wakes on BB archive close-out", async () => {
     const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
     const openHold: Hold = {
       id: "hold-1",
@@ -265,12 +265,12 @@ describe("Fleet archive sync (P-SYNC-1)", () => {
     });
     assert.equal(fleet.fleetNavCounts("tech").inbox, 1);
     assert.equal(fleet.fleetNavCounts("tech").wakes, 2);
-    assert.equal(fleet.closeOutRegistryForArchivedThread("thr_crew"), true);
+    assert.equal(await fleet.closeOutRegistryForArchivedThread("thr_crew"), true);
     assert.equal(fleet.fleetNavCounts("tech").inbox, 0);
     assert.equal(fleet.fleetNavCounts("tech").wakes, 0);
   });
 
-  it("clears mate-targeted terminal and idle wakes on BB archive close-out", () => {
+  it("clears mate-targeted terminal and idle wakes on BB archive close-out", async () => {
     const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
     const { fleet, store } = mockFleetService(nodes);
     store.enqueueWake({
@@ -286,11 +286,11 @@ describe("Fleet archive sync (P-SYNC-1)", () => {
       dedupeKey: "thread.idle:thr_crew",
     });
     assert.equal(fleet.fleetNavCounts("tech").wakes, 2);
-    assert.equal(fleet.closeOutRegistryForArchivedThread("thr_crew"), true);
+    assert.equal(await fleet.closeOutRegistryForArchivedThread("thr_crew"), true);
     assert.equal(fleet.fleetNavCounts("tech").wakes, 0);
   });
 
-  it("resolves open holds before registry close-out on BB archive", () => {
+  it("resolves open holds before registry close-out on BB archive", async () => {
     const nodes = new Map<string, FleetNode>([["n-crew", { ...CREW_NODE }]]);
     const openHold: Hold = {
       id: "hold-1",
@@ -308,13 +308,13 @@ describe("Fleet archive sync (P-SYNC-1)", () => {
     const { fleet, deleted, holds } = mockFleetService(nodes, {
       holds: [openHold],
     });
-    assert.equal(fleet.closeOutRegistryForArchivedThread("thr_crew"), true);
+    assert.equal(await fleet.closeOutRegistryForArchivedThread("thr_crew"), true);
     assert.deepEqual(deleted, ["n-crew"]);
     assert.equal(holds[0]?.state, "resolved");
     assert.ok(holds[0]?.resolvedAtMs != null);
   });
 
-  it("does not remove primary mate on archive event", () => {
+  it("does not remove primary mate on archive event", async () => {
     const nodes = new Map<string, FleetNode>([
       [
         "n-primary",
@@ -335,7 +335,7 @@ describe("Fleet archive sync (P-SYNC-1)", () => {
       ],
     ]);
     const { fleet, deleted } = mockFleetService(nodes);
-    assert.equal(fleet.closeOutRegistryForArchivedThread("thr_primary"), false);
+    assert.equal(await fleet.closeOutRegistryForArchivedThread("thr_primary"), false);
     assert.equal(deleted.length, 0);
     assert.equal(nodes.size, 1);
   });

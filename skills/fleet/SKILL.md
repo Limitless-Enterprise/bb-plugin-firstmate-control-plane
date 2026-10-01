@@ -34,14 +34,15 @@ bb fleet secondmate create --mate cto --thread <threadId> --label platform-lead
   (`interrupt`/`exit` pin liveness dead; see contracts/README.md)
 - `bb fleet inbox --mate cto [--limit 100]` — Captain inbox (JSON: items, totalOpen, limit; max --limit 500)
 - `bb fleet hold open|list|resolve --mate cto [--thread <id>]` — holds (list JSON: `{ holds, openCount }`)
-- `bb fleet sweep --mate cto` — remove orphan registry nodes
+- `bb fleet sweep --mate cto` — prune registry crews whose BB thread is archived (see [contracts/README.md](../../contracts/README.md))
 - `bb fleet profiles --mate cto` — dispatch profiles CRUD
 - `bb fleet digest --mate cto --tell-cos` — CoS digest
 - `bb fleet bearings --mate cto` — CoS bearings snapshot
 - `bb fleet integration apply|check --mate cto` — overlay install/verify
 
-Open the **Fleet** panel in BB for tree + chat (mobile tree toggle; mate-dispatch
-guidance when the tree is empty), inbox (resolve, snooze, Reply composer with
-required steer comment — see
+Open the **Fleet** panel in BB for tree + chat (mobile tree toggle; **New mate
+thread** control with preflight and confirm — RPC only, not CLI; blocked while
+open crew threads remain), mate-dispatch guidance when the tree is empty, inbox
+(resolve, snooze, Reply composer with required steer comment — see
 [contracts/README.md](../../contracts/README.md#fleet-inbox-item)), status board, and
 crew overflow controls.

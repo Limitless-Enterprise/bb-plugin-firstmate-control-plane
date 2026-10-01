@@ -107,6 +107,31 @@ export const rpcContract = defineRpcContract({
     input: z.object({ homeId: z.string() }),
     output: z.object({ deleted: z.boolean() }),
   },
+  resetMateThreadPreflight: {
+    input: z.object({ homeId: z.string() }),
+    output: z.object({
+      allowed: z.boolean(),
+      openChildren: z.array(
+        z.object({
+          threadId: z.string(),
+          label: z.string(),
+          kind: z.enum(["primary", "secondmate", "crew"]),
+        }),
+      ),
+      mateThreadId: z.string(),
+      mateLabel: z.string(),
+    }),
+  },
+  resetMateThread: {
+    input: z.object({
+      homeId: z.string(),
+    }),
+    output: z.object({
+      home: homeSchema,
+      previousMateThreadId: z.string(),
+      mateThreadId: z.string(),
+    }),
+  },
   listThreadCandidates: {
     input: z.object({ limit: z.number().optional() }).optional(),
     output: z.object({

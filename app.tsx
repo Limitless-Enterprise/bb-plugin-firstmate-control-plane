@@ -8,6 +8,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "./contract";
 import type { Home, InboxItem, TreeNode } from "./lib/types";
+import { MateThreadResetControl } from "@/components/mate-thread-reset";
 import { FleetSettingsSection } from "@/components/fleet-settings";
 import { HomesPanel } from "@/components/homes-panel";
 import { Button } from "@/components/ui/button";
@@ -721,6 +722,21 @@ function FleetPage({ subPath }: { subPath?: string }) {
               !treeOpen && mobileTreeDrawerHidden(treeOpen),
             )}
           >
+            {selectedHomeId ? (
+              <MateThreadResetControl
+                homeId={selectedHomeId}
+                mateLabel={
+                  homes.find((home) => home.homeId === selectedHomeId)?.label ??
+                  selectedHomeId
+                }
+                rpc={rpc}
+                onReset={(mateThreadId) => {
+                  selectThread(mateThreadId);
+                  refetch();
+                  refetchHome(selectedHomeId);
+                }}
+              />
+            ) : null}
             {tree.length === 0 ? (
               <p className="px-2 py-4 text-sm text-muted-foreground">
                 No crews in the tree yet. The mate thread dispatches ship, scout,

@@ -63,7 +63,11 @@ Fleet’s status bridge scans `state/<task-id>.status` on every checkout path
 resolved for this home (registry checkout plus BB environment worktrees when
 present). Ledger updates: `working:`, `done:` (incl. PR URLs), `failed:`, `blocked:`,
 `paused:`, `needs-decision:` (opens holds), `resolved:`, and `note:` (appends
-`crew.note` ledger entries).
+`crew.note` ledger entries). The same pass may register crews from
+`state/<task-id>.meta` when absent from the Fleet registry; it skips meta stamped
+`fleet_detached=1` and skips when the BB crew thread is archived. Fleet stamps
+`fleet_detached=1` on task meta before registry close-out (detach or BB archive
+sync) so stale meta cannot resurrect registry nodes.
 
 ## Configuration
 

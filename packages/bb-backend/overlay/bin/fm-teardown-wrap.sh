@@ -89,7 +89,7 @@ if [ "$USE_BB_TEARDOWN" = 1 ]; then
     meta="$FM_ROOT/state/$TASK_ID.meta"
     if [ -f "$meta" ]; then
       tid=$(grep '^bb_thread_id=' "$meta" 2>/dev/null | cut -d= -f2- | head -n1 || true)
-      if [ -n "$tid" ] && command -v bb >/dev/null 2>&1; then
+        if [ -n "$tid" ] && command -v bb >/dev/null 2>&1; then
         hold_json=$(bb fleet hold list --mate "$FM_BB_HOME_ID" --thread "$tid" --json 2>/dev/null) || {
           echo "fm-bb: teardown refused — could not verify open holds for ${TASK_ID}" >&2
           exit 2
@@ -106,7 +106,10 @@ if [ "$USE_BB_TEARDOWN" = 1 ]; then
           echo "fm-bb: teardown refused — ${open_holds} open hold(s) on ${TASK_ID}" >&2
           exit 2
         fi
-        bb fleet detach --mate "$FM_BB_HOME_ID" --thread "$tid" >/dev/null 2>&1
+        if ! bb fleet detach --mate "$FM_BB_HOME_ID" --thread "$tid"; then
+          echo "fm-bb: bb fleet detach failed for task ${TASK_ID} thread ${tid}" >&2
+          exit 2
+        fi
       fi
     fi
   fi

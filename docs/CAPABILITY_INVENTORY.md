@@ -4,7 +4,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 
 **Legend:** ✅ done · 🔲 not done · ⚠ partial
 
-**Last aligned:** 2026-09-25 (`feat/m1-inventory-complete` — batch 6: all M1 🔲 closed; gate green)
+**Last aligned:** 2026-10-01 (`feat/fleet-crew-closeout` — P-U19 mate thread reset; P-SYNC-1 `fleet_detached`)
 
 ---
 
@@ -93,7 +93,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-R6 | Bootstrap auto-apply | ✓ | ✅ |
 | P-R7 | Project/repo binding | ✓ | ✅ |
 | P-R8 | Orphan sweep | ✓ | ✅ |
-| P-SYNC-1 | BB archive ↔ Fleet close-out | ✓ | ✅ |
+| P-SYNC-1 | BB archive ↔ Fleet close-out (`fleet_detached` meta stamp) | ✓ | ✅ |
 
 ### Spawn & dispatch
 
@@ -230,6 +230,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-U16 | Unified cross-home inbox | M2 | 🔲 |
 | P-U17 | Secondmate indent tree | M3 | 🔲 |
 | P-U18 | Homes panel | ✓ | ✅ |
+| P-U19 | New mate thread reset (Tree UI + RPC preflight; spawn-before-archive) | ✓ | ✅ |
 
 ### CoS / digest
 

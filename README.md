@@ -96,7 +96,7 @@ Route prefix: plugin panel **`fleet`** (deep links below).
 
 | Area | What it does |
 | --- | --- |
-| **Tree + Chat** | Mate/crew tree, thread chat, steer; overflow: interrupt, exit, relaunch, detach |
+| **Tree + Chat** | Mate/crew tree, **New mate thread** (RPC reset when no open crew threads), thread chat, steer; overflow: interrupt, exit, relaunch, detach |
 | **Inbox** | Holds, wakes, liveness, stalls, PR signals — resolve, snooze, reply-with-steer |
 | **Board** | Columns by FSM state (working, blocked, idle, done, failed) |
 | **Homes** | Create/select mate homes |
@@ -166,6 +166,16 @@ Live acceptance (against a real mate home):
 export FM_HOME=/path/to/firstmate-checkout
 export MATE=<homeId>
 ./scripts/m1-ac-full.sh
+```
+
+Mate reset and meta close-out RPC checks (running BB + installed plugin; same transport as Fleet Tree UI):
+
+```sh
+export MATE=<homeId>
+export FM_HOME=/path/to/firstmate-checkout
+export BB_CLI=bb   # or rely on scripts/resolve-bb-cli.sh
+./scripts/p-u19-live-rpc.sh
+# Optional destructive mate reset: EXECUTE_MATE_RESET=1 ./scripts/p-u19-live-rpc.sh
 ```
 
 ## Architecture (short)

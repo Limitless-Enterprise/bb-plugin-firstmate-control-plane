@@ -18,6 +18,12 @@ import {
   pathIsGitCheckout,
 } from "./firstmate-checkout";
 import {
+  formatOpenChildBlockMessage,
+  isBbThreadArchived,
+  openChildBlockersFromNodes,
+  type OpenChildBlocker,
+} from "./mate-thread-reset";
+import {
   mateEnvironmentPath,
   resolveMateCheckoutPaths,
   resolveMateStateRoot,
@@ -40,6 +46,7 @@ import type {
   FleetNode,
   FsmState,
   HoldKind,
+  Home,
   LivenessVerdict,
   TreeNode,
 } from "./types";
@@ -72,6 +79,10 @@ import {
   shouldRetryUnconfirmedSubmit,
   steerInboxTitle,
 } from "./fleet-steer-delivery";
+import {
+  appendMetaFleetDetached,
+  isMetaFleetDetached,
+} from "./fleet-meta-closeout";
 import { DIVERGENCE_LEDGER_VERB } from "./status-divergence";
 
 export const FLEET_CHANGED = "fleet-changed";
@@ -699,6 +710,42 @@ export class FleetService {
     }
   }
 
+  private async markTaskMetaFleetDetached(
+    checkoutPath: string,
+    taskId: string,
+  ): Promise<void> {
+    const metaPath = path.join(checkoutPath, "state", `${taskId}.meta`);
+    let meta: string;
+    try {
+      meta = await fs.readFile(metaPath, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return;
+      }
+      throw error;
+    }
+    await fs.writeFile(metaPath, appendMetaFleetDetached(meta), "utf8");
+  }
+
+  async markTaskMetaFleetDetachedForHome(
+    homeId: string,
+    taskId: string,
+  ): Promise<void> {
+    for (const checkoutPath of await this.mateCheckoutPaths(homeId)) {
+      await this.markTaskMetaFleetDetached(checkoutPath, taskId);
+    }
+  }
+
+  private async isBbThreadOpen(threadId: string): Promise<boolean> {
+    if (isLegacyFleetThreadId(threadId)) return false;
+    try {
+      const thread = await this.bb.sdk.threads.get({ threadId });
+      return !isBbThreadArchived(thread);
+    } catch {
+      return false;
+    }
+  }
+
   async syncCrewsFromStateMeta(
     homeId: string,
     checkoutPaths: string[],
@@ -735,6 +782,10 @@ export class FleetService {
           continue;
         }
 
+        if (isMetaFleetDetached(meta)) {
+          continue;
+        }
+
         const kind = metaField(meta, "kind");
         if (kind !== "ship" && kind !== "scout") continue;
 
@@ -742,6 +793,12 @@ export class FleetService {
         const bbThreadId = metaField(meta, "bb_thread_id");
         const windowThread = metaField(meta, "window")?.match(/^@thread:(.+)$/)?.[1];
         const threadId = bbThreadId || windowThread;
+
+        if (threadId && !isLegacyFleetThreadId(threadId)) {
+          if (!(await this.isBbThreadOpen(threadId))) {
+            continue;
+          }
+        }
 
         let statusPrefix: string | null = null;
         let statusFsm: FsmState | null = null;
@@ -989,6 +1046,159 @@ export class FleetService {
       throw new Error(`Home "${homeId}" not found.`);
     }
     this.publish();
+  }
+
+  async resolveOpenChildBlockers(homeId: string): Promise<OpenChildBlocker[]> {
+    this.assertHome(homeId);
+    const nodes = this.store.listNodes(homeId).filter((n) => n.kind !== "primary");
+    const archivedByThreadId = new Map<string, boolean>();
+    for (const node of nodes) {
+      if (archivedByThreadId.has(node.threadId)) continue;
+      if (isLegacyFleetThreadId(node.threadId)) {
+        archivedByThreadId.set(node.threadId, true);
+        continue;
+      }
+      try {
+        const thread = await this.bb.sdk.threads.get({
+          threadId: node.threadId,
+        });
+        archivedByThreadId.set(node.threadId, isBbThreadArchived(thread));
+      } catch {
+        archivedByThreadId.set(node.threadId, false);
+      }
+    }
+    return openChildBlockersFromNodes(
+      this.store.listNodes(homeId),
+      archivedByThreadId,
+    );
+  }
+
+  async resetMateThreadPreflight(homeId: string): Promise<{
+    allowed: boolean;
+    openChildren: OpenChildBlocker[];
+    mateThreadId: string;
+    mateLabel: string;
+  }> {
+    this.assertHome(homeId);
+    const home = this.store.getHome(homeId)!;
+    const openChildren = await this.resolveOpenChildBlockers(homeId);
+    return {
+      allowed: openChildren.length === 0,
+      openChildren,
+      mateThreadId: home.mateThreadId,
+      mateLabel: home.label,
+    };
+  }
+
+  async resetMateThread(homeId: string): Promise<{
+    home: Home;
+    previousMateThreadId: string;
+    mateThreadId: string;
+  }> {
+    this.assertHome(homeId);
+    const home = this.store.getHome(homeId)!;
+    const openChildren = await this.resolveOpenChildBlockers(homeId);
+    if (openChildren.length > 0) {
+      throw new Error(formatOpenChildBlockMessage(openChildren));
+    }
+
+    const previousMateThreadId = home.mateThreadId;
+    let oldMateProjectId: string;
+    try {
+      const oldMate = await this.bb.sdk.threads.get({
+        threadId: previousMateThreadId,
+      });
+      oldMateProjectId = oldMate.projectId;
+    } catch {
+      oldMateProjectId = await this.ensureHomeProject({
+        homeId,
+        label: home.label,
+        checkoutPath: home.checkoutPath,
+      });
+    }
+
+    const mateExecution = await this.readMateDefaults();
+    const thread = await this.bb.sdk.threads.spawn({
+      projectId: oldMateProjectId,
+      environment: { type: "project-default" },
+      providerId: mateExecution.providerId,
+      model: mateExecution.model,
+      prompt: matePromptWithBbIntegration({ label: home.label, homeId }),
+      title: `${home.label} mate`,
+      pluginMetadata: { fleetHomeId: homeId, fleetRole: "primary" },
+    });
+
+    try {
+      let previousAlreadyArchived = await this.probeBbThreadArchived(
+        previousMateThreadId,
+      );
+      if (!previousAlreadyArchived) {
+        try {
+          await this.bb.sdk.threads.stop({ threadId: previousMateThreadId });
+        } catch {
+          // may already be stopped
+        }
+        try {
+          await this.archiveBbThread(previousMateThreadId);
+        } catch (archiveError) {
+          if (!(await this.probeBbThreadArchived(previousMateThreadId))) {
+            throw archiveError;
+          }
+        }
+      }
+    } catch (error) {
+      if (await this.probeBbThreadArchived(previousMateThreadId)) {
+        // previous mate is archived; continue with integration
+      } else {
+        const discarded = await this.discardBbMateThread(thread.id);
+        const detail = error instanceof Error ? error.message : String(error);
+        if (!discarded) {
+          throw new Error(
+            `Mate reset failed while archiving previous mate (${previousMateThreadId}). Spawned replacement (${thread.id}) may still be live in BB; discard archive failed. ${detail}`,
+          );
+        }
+        throw error;
+      }
+    }
+
+    try {
+      await this.ensureBbIntegration({
+        homeId,
+        mateThreadId: thread.id,
+        checkoutPath: home.checkoutPath,
+      });
+
+      const updated = this.updateHome(homeId, { mateThreadId: thread.id });
+      if (!updated) {
+        throw new Error(`Home "${homeId}" not found after mate reset.`);
+      }
+    } catch (error) {
+      const discarded = await this.discardBbMateThread(thread.id);
+      const detail = error instanceof Error ? error.message : String(error);
+      const discardNote = discarded
+        ? "Spawned replacement was discarded."
+        : `Spawned replacement (${thread.id}) may still be live in BB; discard archive failed.`;
+      throw new Error(
+        `Mate reset failed after archiving previous mate (${previousMateThreadId}); home still references that archived thread. ${discardNote} ${detail}`,
+      );
+    }
+
+    const updated = this.store.getHome(homeId)!;
+
+    this.store.appendLedger({
+      homeId,
+      threadId: previousMateThreadId,
+      verb: "control.exit",
+      fsmState: "stopped",
+      detail: { reason: "mate.reset", replacedBy: thread.id },
+    });
+
+    this.publish();
+    return {
+      home: updated,
+      previousMateThreadId,
+      mateThreadId: thread.id,
+    };
   }
 
   async registerHome(input: {
@@ -1735,8 +1945,8 @@ export class FleetService {
     }
   }
 
-  /** BB→Fleet close-out (P-SYNC-1): resolve holds, clear inbox/wakes, remove node. */
-  closeOutRegistryForArchivedThread(threadId: string): boolean {
+  /** BB→Fleet close-out (P-SYNC-1): resolve holds, clear inbox/wakes, stamp meta, delete node. */
+  async closeOutRegistryForArchivedThread(threadId: string): Promise<boolean> {
     const node = this.store.getNodeByThread(threadId);
     if (!node || node.kind === "primary") return false;
     const resolvedHoldIds: string[] = [];
@@ -1754,9 +1964,41 @@ export class FleetService {
       fsmState: "stopped",
       detail: { source: "bb.thread.archived" },
     });
+    await this.markTaskMetaFleetDetachedForHome(node.homeId, node.label);
     this.store.deleteNode(node.id);
     this.publish();
     return true;
+  }
+
+  private async probeBbThreadArchived(
+    threadId: string,
+    maxAttempts = 3,
+  ): Promise<boolean> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const mate = await this.bb.sdk.threads.get({ threadId });
+        return isBbThreadArchived(mate);
+      } catch {
+        // retry transient lookup failures
+      }
+    }
+    return false;
+  }
+
+  private async discardBbMateThread(threadId: string): Promise<boolean> {
+    try {
+      await this.bb.sdk.threads.stop({ threadId });
+    } catch {
+      // may already be stopped
+    }
+    if (isLegacyFleetThreadId(threadId)) return true;
+    try {
+      await this.bb.sdk.threads.archive({ threadId });
+      return true;
+    } catch (error) {
+      this.bb.log.warn(`fleet: discard BB thread ${threadId} failed: ${error}`);
+      return false;
+    }
   }
 
   async archiveBbThread(threadId: string): Promise<void> {
@@ -1769,7 +2011,7 @@ export class FleetService {
     }
   }
 
-  /** Fleet→BB close-out (P-SYNC-1): stop, archive (must succeed), clear inbox/wakes, delete node. */
+  /** Fleet→BB close-out (P-SYNC-1): stamp meta, stop, archive (must succeed), clear inbox/wakes, delete node. */
   async detachCrew(homeId: string, threadId: string): Promise<void> {
     this.assertHome(homeId);
     const node = this.store.getNodeByThread(threadId);
@@ -1782,6 +2024,7 @@ export class FleetService {
     if (this.hasOpenHolds(homeId, threadId)) {
       throw new Error("Cannot detach while open holds exist on this crew.");
     }
+    await this.markTaskMetaFleetDetachedForHome(homeId, node.label);
     try {
       await this.bb.sdk.threads.stop({ threadId });
     } catch {
@@ -1813,11 +2056,16 @@ export class FleetService {
 
       let threadMissing = false;
       let threadLookupFailed = false;
+      let threadArchived = false;
       try {
         const thread = await this.bb.sdk.threads.get({
           threadId: node.threadId,
         });
-        if (!thread) threadMissing = true;
+        if (!thread) {
+          threadMissing = true;
+        } else {
+          threadArchived = isBbThreadArchived(thread);
+        }
       } catch {
         threadLookupFailed = true;
       }
@@ -1832,21 +2080,46 @@ export class FleetService {
       }
 
       let metaPresent = false;
+      let metaRaw: string | null = null;
       for (const checkoutPath of checkoutPaths) {
         const metaPath = path.join(checkoutPath, "state", `${node.label}.meta`);
         if (await pathExists(metaPath)) {
           metaPresent = true;
+          try {
+            metaRaw = await fs.readFile(metaPath, "utf8");
+          } catch {
+            metaRaw = null;
+          }
           break;
         }
       }
 
-      if (metaPresent) {
+      if (
+        metaPresent &&
+        (!metaRaw || !isMetaFleetDetached(metaRaw)) &&
+        !threadArchived
+      ) {
         if (threadMissing) {
           skipped.push({
             threadId: node.threadId,
             label: node.label,
             reason: "meta-without-thread",
           });
+        }
+        continue;
+      }
+
+      if (threadArchived) {
+        if (this.hasOpenHolds(homeId, node.threadId)) {
+          skipped.push({
+            threadId: node.threadId,
+            label: node.label,
+            reason: "open holds",
+          });
+          continue;
+        }
+        if (await this.closeOutRegistryForArchivedThread(node.threadId)) {
+          removed.push({ threadId: node.threadId, label: node.label });
         }
         continue;
       }

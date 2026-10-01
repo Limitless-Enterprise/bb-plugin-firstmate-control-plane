@@ -240,6 +240,9 @@ export default async function plugin(bb: BbPluginApi) {
       fleet.deleteHome(input.homeId);
       return { deleted: true };
     },
+    resetMateThreadPreflight: async (input) =>
+      await fleet.resetMateThreadPreflight(input.homeId),
+    resetMateThread: async (input) => await fleet.resetMateThread(input.homeId),
     listThreadCandidates: async (input) => ({
       threads: await fleet.listThreadCandidates(input?.limit ?? 40),
     }),
@@ -380,7 +383,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.events.on("thread.archived", async (event) => {
     const threadId = event.thread.id;
-    fleet.closeOutRegistryForArchivedThread(threadId);
+    await fleet.closeOutRegistryForArchivedThread(threadId);
   });
 
   bb.events.on("thread.idle", async (event) => {

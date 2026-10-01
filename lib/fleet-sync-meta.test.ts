@@ -70,7 +70,18 @@ describe("syncCrewsFromStateMeta (B-S9)", () => {
     };
 
     const fleet = new FleetService(
-      { sdk: {}, log: { warn: () => {} }, realtime: { publish: () => {} } } as never,
+      {
+        sdk: {
+          threads: {
+            get: async ({ threadId }: { threadId: string }) => ({
+              id: threadId,
+              archivedAt: null,
+            }),
+          },
+        },
+        log: { warn: () => {} },
+        realtime: { publish: () => {} },
+      } as never,
       store as never,
     );
 
@@ -78,5 +89,79 @@ describe("syncCrewsFromStateMeta (B-S9)", () => {
     assert.equal(synced, 1);
     assert.deepEqual(inserted, [{ threadId: "thr_ship", label: "ship-1" }]);
     assert.ok(ledger.some((row) => row.verb === "crew.working"));
+  });
+
+  it("skips meta sync when BB thread is archived", async () => {
+    const checkout = await checkoutWithMeta(
+      "ship-archived",
+      ["kind=ship", "bb_thread_id=thr_archived", "mode=no-mistakes"].join("\n"),
+    );
+
+    const fleet = new FleetService(
+      {
+        sdk: {
+          threads: {
+            get: async ({ threadId }: { threadId: string }) => ({
+              id: threadId,
+              archivedAt: Date.now(),
+            }),
+          },
+        },
+        log: { warn: () => {} },
+        realtime: { publish: () => {} },
+      } as never,
+      {
+        getHome: () => HOME,
+        listNodes: () => [],
+        insertNode() {
+          assert.fail("should not insert archived crew");
+        },
+        appendLedger: () => {},
+        setLiveness: () => {},
+      } as never,
+    );
+
+    const synced = await fleet.syncCrewsFromStateMeta("tech", [checkout]);
+    assert.equal(synced, 0);
+  });
+
+  it("skips meta sync when fleet_detached is set", async () => {
+    const checkout = await checkoutWithMeta(
+      "ship-done",
+      [
+        "kind=ship",
+        "bb_thread_id=thr_live",
+        "fleet_detached=1",
+        "mode=no-mistakes",
+      ].join("\n"),
+    );
+
+    let inserted = 0;
+    const fleet = new FleetService(
+      {
+        sdk: {
+          threads: {
+            get: async () => {
+              assert.fail("should not query BB when meta is fleet_detached");
+            },
+          },
+        },
+        log: { warn: () => {} },
+        realtime: { publish: () => {} },
+      } as never,
+      {
+        getHome: () => HOME,
+        listNodes: () => [],
+        insertNode() {
+          inserted += 1;
+        },
+        appendLedger: () => {},
+        setLiveness: () => {},
+      } as never,
+    );
+
+    const synced = await fleet.syncCrewsFromStateMeta("tech", [checkout]);
+    assert.equal(synced, 0);
+    assert.equal(inserted, 0);
   });
 });

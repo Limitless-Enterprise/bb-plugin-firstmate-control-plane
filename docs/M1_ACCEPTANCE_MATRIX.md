@@ -8,7 +8,7 @@ The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it 
 
 | Kind | Meaning |
 |------|---------|
-| **live** | `scripts/m1-ac-full.sh` or `m1-ac-live-*` against `tech` mate |
+| **live** | `scripts/m1-ac-full.sh`, `scripts/p-u19-live-rpc.sh` (BB + plugin RPC; `scripts/no-mistakes-test-live.sh` when `scripts/resolve-bb-cli.sh` finds `bb`), or `m1-ac-live-*` against `tech` mate |
 | **unit** | `pnpm test` (`lib/*.test.ts` for promoted **M1 ✓** capabilities; `scripts/bb-backend-m1-contract.sh` for overlay B-O8–B-O11 fail-closed, B-W4 validate_spawn, B-O1/B-O5/B-O7 with stub `bb`; `scripts/spawn-wrap-m1-contract.sh` for native spawn wraps). Batch 6 closed all remaining **M1 ✓** **🔲** rows; gate passes when every **M1 ✓** row is **✅** |
 | **lint** | `pnpm run typecheck` + repo linters |
 | **doc** | File present and matches behavior |
@@ -17,7 +17,13 @@ The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it 
 
 | ID | Capability | Verify |
 |----|------------|--------|
-| P-SYNC-1 | BB ↔ Fleet close-out (`thread.archived` → registry; `detachCrew` → BB archive) | unit: `fleet-archive-sync.test.ts` (resolve holds; clear inbox incl. snoozed; ack crew- and mate-targeted wakes; detach archives before `deleteNode`, fail-closed on archive error); live: archive child thread → node removed; detach → thread archived (not deleted) |
+| P-SYNC-1 | BB ↔ Fleet close-out (`thread.archived` → registry; `detachCrew` → BB archive; `fleet_detached` on meta) | unit: `fleet-archive-sync.test.ts` (resolve holds; clear inbox incl. snoozed; ack crew- and mate-targeted wakes; detach stamps meta then archives before `deleteNode`, fail-closed on archive error); `fleet-sync-meta.test.ts` (skip meta sync when BB thread archived or `fleet_detached` set); `fleet-meta-closeout.test.ts`; `fleet-sweep.test.ts` (sweep removes registry when BB thread archived); live: archive child thread → node removed; detach → thread archived (not deleted); optional RPC script: `P-SYNC-meta-stamp` / `P-SYNC-sweep-tree` in `scripts/p-u19-live-rpc.sh` |
+
+## Mate thread reset (P-U19)
+
+| ID | Capability | Verify |
+|----|------------|--------|
+| P-U19 | New mate thread reset (Tree UI + `resetMateThreadPreflight` / `resetMateThread` RPC; no CLI) | unit: `fleet-mate-reset.test.ts` (open-child blockers incl. legacy ids and fail-closed `threads.get`; spawn-before-archive; `fleet_detached` on close-out); `mate-thread-reset.test.ts`; **live:** `scripts/p-u19-live-rpc.sh` (same RPC as Tree UI; set `BB_CLI`, `MATE=tech`, optional `EXECUTE_MATE_RESET=1`); doc: [contracts/README.md](../contracts/README.md) (mate thread reset RPC contract) |
 
 ## Inbox (P-H10)
 
