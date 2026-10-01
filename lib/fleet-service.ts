@@ -1130,17 +1130,17 @@ export class FleetService {
       checkoutPath: home.checkoutPath,
     });
 
-    const updated = this.updateHome(homeId, { mateThreadId: thread.id });
-    if (!updated) {
-      throw new Error(`Home "${homeId}" not found after mate reset.`);
-    }
-
     try {
       await this.bb.sdk.threads.stop({ threadId: previousMateThreadId });
     } catch {
       // may already be stopped
     }
     await this.archiveBbThread(previousMateThreadId);
+
+    const updated = this.updateHome(homeId, { mateThreadId: thread.id });
+    if (!updated) {
+      throw new Error(`Home "${homeId}" not found after mate reset.`);
+    }
 
     this.store.appendLedger({
       homeId,

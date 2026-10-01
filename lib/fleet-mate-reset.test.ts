@@ -100,6 +100,7 @@ function mateResetFleet(options: {
             : home.defaultProfileId,
       };
       if (patch.mateThreadId) {
+        bbEvents.push(`persist:${patch.mateThreadId}`);
         const primary = nodes.find((n) => n.kind === "primary");
         if (primary) primary.threadId = patch.mateThreadId;
       }
@@ -238,7 +239,7 @@ describe("resolveOpenChildBlockers / resetMateThreadPreflight", () => {
 });
 
 describe("resetMateThread", () => {
-  it("spawns and updates home before stopping or archiving the previous mate", async () => {
+  it("spawns before stop/archive and persists home only after archive succeeds", async () => {
     const checkoutPath = await minimalGitCheckout();
     const home = { ...BASE_HOME, checkoutPath };
     const { fleet, bbEvents, getHome } = mateResetFleet({
@@ -254,9 +255,11 @@ describe("resetMateThread", () => {
     const spawnIdx = bbEvents.indexOf("spawn");
     const stopIdx = bbEvents.indexOf("stop:thr_mate_old");
     const archiveIdx = bbEvents.indexOf("archive:thr_mate_old");
+    const persistIdx = bbEvents.indexOf("persist:thr_mate_new");
     assert.ok(spawnIdx >= 0);
     assert.ok(stopIdx > spawnIdx);
     assert.ok(archiveIdx > spawnIdx);
+    assert.ok(persistIdx > archiveIdx);
   });
 
   it("does not archive the previous mate when spawn fails", async () => {
