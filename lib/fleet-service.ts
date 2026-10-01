@@ -1050,6 +1050,10 @@ export class FleetService {
     const archivedByThreadId = new Map<string, boolean>();
     for (const node of nodes) {
       if (archivedByThreadId.has(node.threadId)) continue;
+      if (isLegacyFleetThreadId(node.threadId)) {
+        archivedByThreadId.set(node.threadId, true);
+        continue;
+      }
       try {
         const thread = await this.bb.sdk.threads.get({
           threadId: node.threadId,
@@ -1109,13 +1113,6 @@ export class FleetService {
       });
     }
 
-    try {
-      await this.bb.sdk.threads.stop({ threadId: previousMateThreadId });
-    } catch {
-      // may already be stopped
-    }
-    await this.archiveBbThread(previousMateThreadId);
-
     const mateExecution = await this.readMateDefaults();
     const thread = await this.bb.sdk.threads.spawn({
       projectId: oldMateProjectId,
@@ -1137,6 +1134,13 @@ export class FleetService {
       mateThreadId: thread.id,
       checkoutPath: updated.checkoutPath,
     });
+
+    try {
+      await this.bb.sdk.threads.stop({ threadId: previousMateThreadId });
+    } catch {
+      // may already be stopped
+    }
+    await this.archiveBbThread(previousMateThreadId);
 
     this.store.appendLedger({
       homeId,
