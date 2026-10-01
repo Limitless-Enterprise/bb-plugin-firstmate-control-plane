@@ -196,7 +196,9 @@ while switching rows; the composer stays open until steer succeeds or shows an e
 - Captain inbox via `bb fleet inbox [--mate <homeId>] [--json] [--limit N]` — JSON
   `{ items, totalOpen, limit }`; default limit 100, max 500.
 - Holds via `bb fleet hold open|list|resolve` (see [Hold](#hold)).
-- Orphan cleanup via `bb fleet sweep [--mate <homeId>] [--json]` — `{ removed, skipped }`.
+- Orphan cleanup via `bb fleet sweep [--mate <homeId>] [--json]` — `{ removed, skipped }`;
+  removes registry crew nodes whose BB thread is archived (or missing with safe
+  meta), including stale nodes left after detach, when no open holds block removal.
 - Dispatch profiles via `bb fleet profiles --mate <homeId>`.
 - Captain attention via **Fleet Inbox** only — not Command Center inbox.
 
@@ -209,9 +211,12 @@ for that home; with no home selected, sums those three fields from
 no CLI): `resetMateThreadPreflight` returns `{ allowed, openChildren, mateThreadId,
 mateLabel }` after checking BB archive state for each non-primary node (legacy
 `legacy:*` thread ids are ignored; `threads.get` failure fail-closes as blocking).
-`resetMateThread` spawns the replacement mate, updates the home and integration,
-then stops/archives the previous mate thread; rejects when `openChildren` is
-non-empty.
+`resetMateThread` spawns the replacement mate, stops/archives the previous mate
+thread (idempotent when the previous mate is already archived), applies integration
+on the new thread, then updates the home; rejects when `openChildren` is
+non-empty. Integration or home-update failures after the previous mate is archived
+roll back the spawned thread and leave the home on the previous mate id until retry
+succeeds.
 
 ## Isolation
 
@@ -250,8 +255,8 @@ registry and environment checkout paths (`lib/mate-checkout-paths.ts`), scans ea
 scan also runs `syncCrewsFromStateMeta` (B-S9): register missing ship/scout crews
 from `state/<id>.meta`, skipping meta with `fleet_detached=1` and skipping when
 the linked BB crew thread is archived. Close-out stamps `fleet_detached=1` on task
-meta when a registry crew node is removed via BB archive sync or Fleet `detachCrew`
-so stale meta cannot resurrect nodes.
+meta before registry removal (`detachCrew` before BB archive; BB archive sync
+before `deleteNode`) so stale meta cannot resurrect nodes.
 PR poller watches GitHub checks and PR lifecycle (review, commits, merge retire).
 
 **GitHub webhook (P-P7):** `POST /github/webhook` on the plugin HTTP server.

@@ -17,7 +17,7 @@ The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it 
 
 | ID | Capability | Verify |
 |----|------------|--------|
-| P-SYNC-1 | BB ↔ Fleet close-out (`thread.archived` → registry; `detachCrew` → BB archive; `fleet_detached` on meta) | unit: `fleet-archive-sync.test.ts` (resolve holds; clear inbox incl. snoozed; ack crew- and mate-targeted wakes; detach archives before `deleteNode`, fail-closed on archive error); `fleet-sync-meta.test.ts` (skip meta sync when BB thread archived or `fleet_detached` set); `fleet-meta-closeout.test.ts`; live: archive child thread → node removed; detach → thread archived (not deleted) |
+| P-SYNC-1 | BB ↔ Fleet close-out (`thread.archived` → registry; `detachCrew` → BB archive; `fleet_detached` on meta) | unit: `fleet-archive-sync.test.ts` (resolve holds; clear inbox incl. snoozed; ack crew- and mate-targeted wakes; detach stamps meta then archives before `deleteNode`, fail-closed on archive error); `fleet-sync-meta.test.ts` (skip meta sync when BB thread archived or `fleet_detached` set); `fleet-meta-closeout.test.ts`; `fleet-sweep.test.ts` (sweep removes registry when BB thread archived); live: archive child thread → node removed; detach → thread archived (not deleted) |
 
 ## Mate thread reset (P-U19)
 

@@ -1945,7 +1945,7 @@ export class FleetService {
     }
   }
 
-  /** BB→Fleet close-out (P-SYNC-1): resolve holds, clear inbox/wakes, remove node. */
+  /** BB→Fleet close-out (P-SYNC-1): resolve holds, clear inbox/wakes, stamp meta, delete node. */
   async closeOutRegistryForArchivedThread(threadId: string): Promise<boolean> {
     const node = this.store.getNodeByThread(threadId);
     if (!node || node.kind === "primary") return false;
@@ -2011,7 +2011,7 @@ export class FleetService {
     }
   }
 
-  /** Fleet→BB close-out (P-SYNC-1): stop, archive (must succeed), clear inbox/wakes, delete node. */
+  /** Fleet→BB close-out (P-SYNC-1): stamp meta, stop, archive (must succeed), clear inbox/wakes, delete node. */
   async detachCrew(homeId: string, threadId: string): Promise<void> {
     this.assertHome(homeId);
     const node = this.store.getNodeByThread(threadId);

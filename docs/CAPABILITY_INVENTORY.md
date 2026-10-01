@@ -93,7 +93,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-R6 | Bootstrap auto-apply | ✓ | ✅ |
 | P-R7 | Project/repo binding | ✓ | ✅ |
 | P-R8 | Orphan sweep | ✓ | ✅ |
-| P-SYNC-1 | BB archive ↔ Fleet close-out | ✓ | ✅ |
+| P-SYNC-1 | BB archive ↔ Fleet close-out (`fleet_detached` meta stamp) | ✓ | ✅ |
 
 ### Spawn & dispatch
 

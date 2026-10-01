@@ -66,8 +66,8 @@ present). Ledger updates: `working:`, `done:` (incl. PR URLs), `failed:`, `block
 `crew.note` ledger entries). The same pass may register crews from
 `state/<task-id>.meta` when absent from the Fleet registry; it skips meta stamped
 `fleet_detached=1` and skips when the BB crew thread is archived. Fleet stamps
-`fleet_detached=1` on task meta when a crew closes out (detach or BB archive sync)
-so stale meta cannot resurrect registry nodes.
+`fleet_detached=1` on task meta before registry close-out (detach or BB archive
+sync) so stale meta cannot resurrect registry nodes.
 
 ## Configuration
 
