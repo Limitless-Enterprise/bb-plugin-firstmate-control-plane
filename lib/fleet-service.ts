@@ -1124,18 +1124,18 @@ export class FleetService {
       pluginMetadata: { fleetHomeId: homeId, fleetRole: "primary" },
     });
 
-    await this.ensureBbIntegration({
-      homeId,
-      mateThreadId: thread.id,
-      checkoutPath: home.checkoutPath,
-    });
-
     try {
       await this.bb.sdk.threads.stop({ threadId: previousMateThreadId });
     } catch {
       // may already be stopped
     }
     await this.archiveBbThread(previousMateThreadId);
+
+    await this.ensureBbIntegration({
+      homeId,
+      mateThreadId: thread.id,
+      checkoutPath: home.checkoutPath,
+    });
 
     const updated = this.updateHome(homeId, { mateThreadId: thread.id });
     if (!updated) {
