@@ -1950,6 +1950,7 @@ export class FleetService {
     if (this.hasOpenHolds(homeId, threadId)) {
       throw new Error("Cannot detach while open holds exist on this crew.");
     }
+    await this.markTaskMetaFleetDetachedForHome(homeId, node.label);
     try {
       await this.bb.sdk.threads.stop({ threadId });
     } catch {
@@ -1962,7 +1963,6 @@ export class FleetService {
       this.holdIdsForThread(homeId, threadId),
     );
     this.store.deleteNode(node.id);
-    await this.markTaskMetaFleetDetachedForHome(homeId, node.label);
     this.publish();
   }
 
@@ -2031,6 +2031,21 @@ export class FleetService {
             label: node.label,
             reason: "meta-without-thread",
           });
+        }
+        continue;
+      }
+
+      if (threadArchived) {
+        if (this.hasOpenHolds(homeId, node.threadId)) {
+          skipped.push({
+            threadId: node.threadId,
+            label: node.label,
+            reason: "open holds",
+          });
+          continue;
+        }
+        if (this.closeOutRegistryForArchivedThread(node.threadId)) {
+          removed.push({ threadId: node.threadId, label: node.label });
         }
         continue;
       }
