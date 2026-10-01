@@ -96,7 +96,7 @@ Route prefix: plugin panel **`fleet`** (deep links below).
 
 | Area | What it does |
 | --- | --- |
-| **Tree + Chat** | Mate/crew tree, thread chat, steer; overflow: interrupt, exit, relaunch, detach |
+| **Tree + Chat** | Mate/crew tree, **New mate thread** (RPC reset when no open crew threads), thread chat, steer; overflow: interrupt, exit, relaunch, detach |
 | **Inbox** | Holds, wakes, liveness, stalls, PR signals — resolve, snooze, reply-with-steer |
 | **Board** | Columns by FSM state (working, blocked, idle, done, failed) |
 | **Homes** | Create/select mate homes |
