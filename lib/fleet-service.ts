@@ -160,7 +160,7 @@ export class FleetService {
     ...DEFAULT_FLEET_RUNTIME_LIMITS,
   };
   private cosThreadId: string | null = null;
-  private readonly mateWorktreeIntegrationFollowUp = new Set<string>();
+  private readonly mateWorktreeIntegrationFollowUp = new Map<string, number>();
 
   constructor(
     private readonly bb: BbPluginApi,
@@ -337,13 +337,34 @@ export class FleetService {
     return applyMateIntegrationToCheckouts(this.bb, target, needing);
   }
 
+  private async mateWorktreeIntegrationFollowUpSettled(
+    homeId: string,
+  ): Promise<boolean> {
+    const home = this.store.getHome(homeId);
+    if (!home) return true;
+    const envPath = await mateEnvironmentPath(this.bb, home.mateThreadId);
+    if (envPath === null) return false;
+    const stillNeeding = await mateCheckoutPathsNeedingIntegration(this.bb, {
+      homeId: home.homeId,
+      checkoutPath: home.checkoutPath,
+      mateThreadId: home.mateThreadId,
+    });
+    return stillNeeding.length === 0;
+  }
+
   scheduleMateWorktreeIntegrationFollowUp(homeId: string): void {
-    if (this.mateWorktreeIntegrationFollowUp.has(homeId)) return;
-    this.mateWorktreeIntegrationFollowUp.add(homeId);
+    const deadline = Date.now() + MATE_WORKTREE_INTEGRATION_FOLLOW_UP_MS;
+    if (this.mateWorktreeIntegrationFollowUp.has(homeId)) {
+      this.mateWorktreeIntegrationFollowUp.set(homeId, deadline);
+      return;
+    }
+    this.mateWorktreeIntegrationFollowUp.set(homeId, deadline);
     void (async () => {
       try {
-        const deadline = Date.now() + MATE_WORKTREE_INTEGRATION_FOLLOW_UP_MS;
-        while (Date.now() < deadline) {
+        while (
+          Date.now() <
+          (this.mateWorktreeIntegrationFollowUp.get(homeId) ?? 0)
+        ) {
           const applied =
             await this.reconcileMateWorktreeIntegration(homeId);
           if (applied.length > 0) {
@@ -351,17 +372,9 @@ export class FleetService {
               `fleet: applied mate worktree integration for "${homeId}" on ${applied.join(", ")}`,
             );
           }
-          const home = this.store.getHome(homeId);
-          if (!home) return;
-          const stillNeeding = await mateCheckoutPathsNeedingIntegration(
-            this.bb,
-            {
-              homeId: home.homeId,
-              checkoutPath: home.checkoutPath,
-              mateThreadId: home.mateThreadId,
-            },
-          );
-          if (stillNeeding.length === 0) return;
+          if (await this.mateWorktreeIntegrationFollowUpSettled(homeId)) {
+            return;
+          }
           await sleepMs(MATE_WORKTREE_INTEGRATION_POLL_MS);
         }
         const home = this.store.getHome(homeId);
