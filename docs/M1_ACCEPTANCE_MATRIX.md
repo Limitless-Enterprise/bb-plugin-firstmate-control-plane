@@ -23,7 +23,7 @@ The legacy 24-check `scripts/m1-ac-full.sh` remains a **fast smoke** subset; it 
 
 | ID | Capability | Verify |
 |----|------------|--------|
-| P-U19 | New mate thread reset (Tree UI + `resetMateThreadPreflight` / `resetMateThread` RPC; no CLI) | unit: `fleet-mate-reset.test.ts` (open-child blockers incl. legacy ids and fail-closed `threads.get`; spawn-before-archive; `fleet_detached` on close-out); `mate-thread-reset.test.ts`; **live:** `scripts/p-u19-live-rpc.sh` (same RPC as Tree UI; set `BB_CLI`, `MATE=tech`, optional `EXECUTE_MATE_RESET=1`); doc: [contracts/README.md](../contracts/README.md) (mate thread reset RPC contract) |
+| P-U19 | New mate thread reset (Tree UI + `resetMateThreadPreflight` / `resetMateThread` RPC; no CLI) | unit: `fleet-mate-reset.test.ts` (open-child blockers incl. legacy ids and fail-closed `threads.get`; spawn-before-archive; `fleet_detached` on close-out); `mate-thread-reset.test.ts`; `mate-worktree-integration.test.ts` (integration self-check on registry vs late mate worktree); **live:** `scripts/p-u19-live-rpc.sh` (same RPC as Tree UI; set `BB_CLI`, `MATE=tech`, optional `EXECUTE_MATE_RESET=1`); doc: [contracts/README.md](../contracts/README.md) (mate thread reset RPC contract) |
 
 ## Inbox (P-H10)
 

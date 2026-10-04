@@ -52,6 +52,11 @@ export class StatusBridge {
     homeId: string,
     checkoutPaths: string[],
   ): Promise<number> {
+    try {
+      await this.fleet.reconcileMateWorktreeIntegration(homeId);
+    } catch {
+      // Best-effort; periodic follow-up from ensureBbIntegration still runs.
+    }
     await this.fleet.syncCrewsFromStateMeta(homeId, checkoutPaths);
     let ingested = 0;
     for (const checkoutPath of checkoutPaths) {

@@ -29,6 +29,11 @@ import {
   resolveMateStateRoot,
 } from "./mate-checkout-paths";
 import {
+  applyMateIntegrationToCheckouts,
+  mateCheckoutPathsNeedingIntegration,
+  sleepMs,
+} from "./mate-worktree-integration";
+import {
   fsmFromStatusPrefix,
   ledgerVerbFromStatus,
   parseStatusLine,
@@ -146,11 +151,19 @@ export const DEFAULT_FLEET_CONFIG: FleetConfig = {
   defaultParentDir: DEFAULT_PARENT_DIR,
 };
 
+/** Poll window after mate reset while BB provisions the mate worktree. */
+const MATE_WORKTREE_INTEGRATION_FOLLOW_UP_MS = 120_000;
+const MATE_WORKTREE_INTEGRATION_POLL_MS = 2_000;
+
 export class FleetService {
   private runtimeLimits: FleetRuntimeLimits = {
     ...DEFAULT_FLEET_RUNTIME_LIMITS,
   };
   private cosThreadId: string | null = null;
+  private readonly mateWorktreeIntegrationFollowUp = new Map<
+    string,
+    { deadline: number; mateThreadId: string; checkoutPath: string }
+  >();
 
   constructor(
     private readonly bb: BbPluginApi,
@@ -303,7 +316,139 @@ export class FleetService {
     if (!last) {
       throw new Error("No checkout path available for BB integration apply.");
     }
+    this.scheduleMateWorktreeIntegrationFollowUp({
+      homeId: input.homeId,
+      mateThreadId: input.mateThreadId,
+      checkoutPath: input.checkoutPath,
+    });
     return last;
+  }
+
+  /**
+   * Apply integration to mate checkouts that still fail self-check (e.g. worktree
+   * appeared after reset). Safe to call repeatedly.
+   */
+  async reconcileMateWorktreeIntegration(
+    homeId: string,
+    integrationTarget?: { mateThreadId: string; checkoutPath: string },
+  ): Promise<string[]> {
+    const home = this.store.getHome(homeId);
+    if (!home) return [];
+    const activeFollowUp = integrationTarget
+      ? undefined
+      : this.mateWorktreeIntegrationFollowUp.get(homeId);
+    const target = {
+      homeId: home.homeId,
+      checkoutPath:
+        integrationTarget?.checkoutPath ??
+        activeFollowUp?.checkoutPath ??
+        home.checkoutPath,
+      mateThreadId:
+        integrationTarget?.mateThreadId ??
+        activeFollowUp?.mateThreadId ??
+        home.mateThreadId,
+    };
+    const needing = await mateCheckoutPathsNeedingIntegration(
+      this.bb,
+      target,
+    );
+    if (needing.length === 0) return [];
+    return applyMateIntegrationToCheckouts(this.bb, target, needing);
+  }
+
+  private async mateWorktreeIntegrationFollowUpSettled(
+    homeId: string,
+    integrationTarget?: { mateThreadId: string; checkoutPath: string },
+  ): Promise<boolean> {
+    const home = this.store.getHome(homeId);
+    if (!home) return true;
+    const mateThreadId =
+      integrationTarget?.mateThreadId ?? home.mateThreadId;
+    const checkoutPath =
+      integrationTarget?.checkoutPath ?? home.checkoutPath;
+    const envPath = await mateEnvironmentPath(this.bb, mateThreadId);
+    if (envPath === null) return false;
+    const stillNeeding = await mateCheckoutPathsNeedingIntegration(this.bb, {
+      homeId: home.homeId,
+      checkoutPath,
+      mateThreadId,
+    });
+    return stillNeeding.length === 0;
+  }
+
+  scheduleMateWorktreeIntegrationFollowUp(input: {
+    homeId: string;
+    mateThreadId: string;
+    checkoutPath: string;
+  }): void {
+    const { homeId } = input;
+    const deadline = Date.now() + MATE_WORKTREE_INTEGRATION_FOLLOW_UP_MS;
+    const followUpEntry = {
+      deadline,
+      mateThreadId: input.mateThreadId,
+      checkoutPath: input.checkoutPath,
+    };
+    if (this.mateWorktreeIntegrationFollowUp.has(homeId)) {
+      this.mateWorktreeIntegrationFollowUp.set(homeId, followUpEntry);
+      return;
+    }
+    this.mateWorktreeIntegrationFollowUp.set(homeId, followUpEntry);
+    void (async () => {
+      try {
+        while (
+          Date.now() <
+          (this.mateWorktreeIntegrationFollowUp.get(homeId)?.deadline ?? 0)
+        ) {
+          const active = this.mateWorktreeIntegrationFollowUp.get(homeId);
+          const integrationTarget = active
+            ? {
+                mateThreadId: active.mateThreadId,
+                checkoutPath: active.checkoutPath,
+              }
+            : undefined;
+          const applied = await this.reconcileMateWorktreeIntegration(
+            homeId,
+            integrationTarget,
+          );
+          if (applied.length > 0) {
+            this.bb.log.info(
+              `fleet: applied mate worktree integration for "${homeId}" on ${applied.join(", ")}`,
+            );
+          }
+          if (
+            await this.mateWorktreeIntegrationFollowUpSettled(
+              homeId,
+              integrationTarget,
+            )
+          ) {
+            return;
+          }
+          await sleepMs(MATE_WORKTREE_INTEGRATION_POLL_MS);
+        }
+        const home = this.store.getHome(homeId);
+        if (!home) return;
+        const active = this.mateWorktreeIntegrationFollowUp.get(homeId);
+        const stillNeeding = await mateCheckoutPathsNeedingIntegration(
+          this.bb,
+          {
+            homeId: home.homeId,
+            checkoutPath: active?.checkoutPath ?? home.checkoutPath,
+            mateThreadId: active?.mateThreadId ?? home.mateThreadId,
+          },
+        );
+        if (stillNeeding.length > 0) {
+          this.bb.log.warn(
+            `fleet: mate worktree integration still pending for "${homeId}" after ${MATE_WORKTREE_INTEGRATION_FOLLOW_UP_MS / 1000}s (${stillNeeding.join(", ")})`,
+          );
+        }
+      } catch (error) {
+        this.bb.log.warn(
+          `fleet: mate worktree integration follow-up failed for "${homeId}": ${error instanceof Error ? error.message : String(error)}`,
+        );
+      } finally {
+        this.mateWorktreeIntegrationFollowUp.delete(homeId);
+      }
+    })();
   }
 
   async checkBbIntegration(input: {
@@ -1173,6 +1318,7 @@ export class FleetService {
         throw new Error(`Home "${homeId}" not found after mate reset.`);
       }
     } catch (error) {
+      this.mateWorktreeIntegrationFollowUp.delete(homeId);
       const discarded = await this.discardBbMateThread(thread.id);
       const detail = error instanceof Error ? error.message : String(error);
       const discardNote = discarded

@@ -5,7 +5,7 @@ Use **Fleet** to register **mate homes** (Firstmate checkouts), watch crew threa
 ## What you get
 
 - **Mate homes** — bootstrap or attach a Firstmate worktree per home; switch homes from the Fleet header.
-- **Crew tree + chat** — ship, scout, and secondmate child threads with status dots, thread chat, **New mate thread** (preflight + confirm; spawns a fresh mate only when no open crew BB threads remain), and overflow actions (interrupt, exit, relaunch, detach).
+- **Crew tree + chat** — ship, scout, and secondmate child threads with status dots, thread chat, **New mate thread** (preflight + confirm; spawns a fresh mate only when no open crew BB threads remain; Fleet re-applies integration when BB provisions the mate worktree), and overflow actions (interrupt, exit, relaunch, detach).
 - **Inbox** — filter by kind, resolve, snooze, or reply with a required steer comment.
 - **Board** — columns by FSM state (working, blocked, idle, done, failed).
 - **CLI** — `bb fleet spawn`, `steer`, `digest`, `integration apply`, holds, sweep, and related commands.

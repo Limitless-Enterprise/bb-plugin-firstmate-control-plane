@@ -37,5 +37,6 @@ docs/bb-integration/
   README.md                # this file
 ```
 
-Re-run `bb fleet integration apply --mate <homeId>` after plugin upgrades.
-`bb fleet integration check --mate <homeId>` validates the installed tree.
+Re-run `bb fleet integration apply --mate <homeId>` after plugin upgrades (mate
+thread reset re-apply is automatic via the Fleet plugin). `bb fleet integration
+check --mate <homeId>` validates the installed tree.
