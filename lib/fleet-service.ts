@@ -29,6 +29,11 @@ import {
   resolveMateStateRoot,
 } from "./mate-checkout-paths";
 import {
+  applyMateIntegrationToCheckouts,
+  mateCheckoutPathsNeedingIntegration,
+  sleepMs,
+} from "./mate-worktree-integration";
+import {
   fsmFromStatusPrefix,
   ledgerVerbFromStatus,
   parseStatusLine,
@@ -146,11 +151,16 @@ export const DEFAULT_FLEET_CONFIG: FleetConfig = {
   defaultParentDir: DEFAULT_PARENT_DIR,
 };
 
+/** Poll window after mate reset while BB provisions the mate worktree. */
+const MATE_WORKTREE_INTEGRATION_FOLLOW_UP_MS = 120_000;
+const MATE_WORKTREE_INTEGRATION_POLL_MS = 2_000;
+
 export class FleetService {
   private runtimeLimits: FleetRuntimeLimits = {
     ...DEFAULT_FLEET_RUNTIME_LIMITS,
   };
   private cosThreadId: string | null = null;
+  private readonly mateWorktreeIntegrationFollowUp = new Set<string>();
 
   constructor(
     private readonly bb: BbPluginApi,
@@ -303,7 +313,80 @@ export class FleetService {
     if (!last) {
       throw new Error("No checkout path available for BB integration apply.");
     }
+    this.scheduleMateWorktreeIntegrationFollowUp(input.homeId);
     return last;
+  }
+
+  /**
+   * Apply integration to mate checkouts that still fail self-check (e.g. worktree
+   * appeared after reset). Safe to call repeatedly.
+   */
+  async reconcileMateWorktreeIntegration(homeId: string): Promise<string[]> {
+    const home = this.store.getHome(homeId);
+    if (!home) return [];
+    const target = {
+      homeId: home.homeId,
+      checkoutPath: home.checkoutPath,
+      mateThreadId: home.mateThreadId,
+    };
+    const needing = await mateCheckoutPathsNeedingIntegration(
+      this.bb,
+      target,
+    );
+    if (needing.length === 0) return [];
+    return applyMateIntegrationToCheckouts(this.bb, target, needing);
+  }
+
+  scheduleMateWorktreeIntegrationFollowUp(homeId: string): void {
+    if (this.mateWorktreeIntegrationFollowUp.has(homeId)) return;
+    this.mateWorktreeIntegrationFollowUp.add(homeId);
+    void (async () => {
+      try {
+        const deadline = Date.now() + MATE_WORKTREE_INTEGRATION_FOLLOW_UP_MS;
+        while (Date.now() < deadline) {
+          const applied =
+            await this.reconcileMateWorktreeIntegration(homeId);
+          if (applied.length > 0) {
+            this.bb.log.info(
+              `fleet: applied mate worktree integration for "${homeId}" on ${applied.join(", ")}`,
+            );
+          }
+          const home = this.store.getHome(homeId);
+          if (!home) return;
+          const stillNeeding = await mateCheckoutPathsNeedingIntegration(
+            this.bb,
+            {
+              homeId: home.homeId,
+              checkoutPath: home.checkoutPath,
+              mateThreadId: home.mateThreadId,
+            },
+          );
+          if (stillNeeding.length === 0) return;
+          await sleepMs(MATE_WORKTREE_INTEGRATION_POLL_MS);
+        }
+        const home = this.store.getHome(homeId);
+        if (!home) return;
+        const stillNeeding = await mateCheckoutPathsNeedingIntegration(
+          this.bb,
+          {
+            homeId: home.homeId,
+            checkoutPath: home.checkoutPath,
+            mateThreadId: home.mateThreadId,
+          },
+        );
+        if (stillNeeding.length > 0) {
+          this.bb.log.warn(
+            `fleet: mate worktree integration still pending for "${homeId}" after ${MATE_WORKTREE_INTEGRATION_FOLLOW_UP_MS / 1000}s (${stillNeeding.join(", ")})`,
+          );
+        }
+      } catch (error) {
+        this.bb.log.warn(
+          `fleet: mate worktree integration follow-up failed for "${homeId}": ${error instanceof Error ? error.message : String(error)}`,
+        );
+      } finally {
+        this.mateWorktreeIntegrationFollowUp.delete(homeId);
+      }
+    })();
   }
 
   async checkBbIntegration(input: {

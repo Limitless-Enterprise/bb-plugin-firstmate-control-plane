@@ -216,7 +216,10 @@ thread (idempotent when the previous mate is already archived), applies integrat
 on the new thread, then updates the home; rejects when `openChildren` is
 non-empty. Integration or home-update failures after the previous mate is archived
 roll back the spawned thread and leave the home on the previous mate id until retry
-succeeds.
+succeeds. **`ensureBbIntegration`** (reset, register, `bb fleet integration apply`)
+also starts a **120s poll** that re-applies integration when the mate BB worktree
+appears after reset; **`StatusBridge.scanMateHome`** runs a best-effort reconcile
+each scan so crews work as soon as the worktree exists.
 
 ## Isolation
 
