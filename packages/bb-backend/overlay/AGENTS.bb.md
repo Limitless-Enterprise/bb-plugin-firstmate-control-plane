@@ -90,6 +90,10 @@ To disable BB routing temporarily (pure CLI Firstmate):
 
 ## Re-apply overlay
 
+After a Fleet **New mate thread** reset, the control plane re-applies this overlay
+to the mate BB worktree when BB creates it (~120s poll + status-bridge reconcile).
+Use manual re-apply mainly after plugin upgrades.
+
 ```sh
 bb fleet integration apply --mate <homeId>
 bb fleet integration check --mate <homeId>

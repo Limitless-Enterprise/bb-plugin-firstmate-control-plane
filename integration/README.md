@@ -14,4 +14,7 @@ bb fleet integration apply --mate tech
 bb fleet integration check --mate tech
 ```
 
-Automatic on `bb fleet home bootstrap` / checkout clone.
+Automatic on `bb fleet home bootstrap`, register, mate reset, and
+`bb fleet integration apply` (includes ~120s re-apply when the mate BB worktree
+appears after reset). See [contracts/README.md](../contracts/README.md) (mate
+thread reset + `ensureBbIntegration`).

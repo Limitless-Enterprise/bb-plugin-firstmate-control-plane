@@ -143,7 +143,11 @@ After cloning Firstmate for a mate home, the plugin writes a portable overlay un
 - Overlay layout: [packages/bb-backend/overlay/README.md](./packages/bb-backend/overlay/README.md)
 - Quick start: [integration/README.md](./integration/README.md)
 
-Re-run **`bb fleet integration apply --mate <homeId>`** after upgrading this plugin when overlay files change.
+After **New mate thread**, the plugin re-applies the overlay to the mate BB
+worktree when BB provisions it (no manual apply in the common case; see
+[contracts/README.md](./contracts/README.md)). Re-run
+**`bb fleet integration apply --mate <homeId>`** after upgrading this plugin when
+overlay files change.
 
 ## Development
 

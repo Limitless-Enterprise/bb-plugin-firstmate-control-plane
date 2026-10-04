@@ -4,7 +4,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 
 **Legend:** ✅ done · 🔲 not done · ⚠ partial
 
-**Last aligned:** 2026-10-01 (`feat/fleet-crew-closeout` — P-U19 mate thread reset; P-SYNC-1 `fleet_detached`)
+**Last aligned:** 2026-10-04 (`feat/mate-worktree-integration-followup` — B-W9 late worktree poll/reconcile)
 
 ---
 
@@ -22,7 +22,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | B-W6 | Meta schema (bb_thread_id, bb_env_id, window, worktree) | ✓ | ✅ |
 | B-W7 | validate_task_endpoint BB arm | ✓ | ✅ |
 | B-W8 | `docs/bb-integration/` (AGENTS.bb.md) + `packages/bb-backend/README.md` | ✓ | ✅ |
-| B-W9 | Apply to canonical + mate worktree | ✓ | ✅ |
+| B-W9 | Apply to canonical + mate worktree (late worktree poll/reconcile) | ✓ | ✅ |
 | B-W10 | Version pin overlay ↔ plugin | ✓ | ✅ |
 
 ### Spawn (native fm-spawn)
