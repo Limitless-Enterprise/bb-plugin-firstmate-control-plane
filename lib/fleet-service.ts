@@ -334,12 +334,19 @@ export class FleetService {
   ): Promise<string[]> {
     const home = this.store.getHome(homeId);
     if (!home) return [];
+    const activeFollowUp = integrationTarget
+      ? undefined
+      : this.mateWorktreeIntegrationFollowUp.get(homeId);
     const target = {
       homeId: home.homeId,
       checkoutPath:
-        integrationTarget?.checkoutPath ?? home.checkoutPath,
+        integrationTarget?.checkoutPath ??
+        activeFollowUp?.checkoutPath ??
+        home.checkoutPath,
       mateThreadId:
-        integrationTarget?.mateThreadId ?? home.mateThreadId,
+        integrationTarget?.mateThreadId ??
+        activeFollowUp?.mateThreadId ??
+        home.mateThreadId,
     };
     const needing = await mateCheckoutPathsNeedingIntegration(
       this.bb,
@@ -1311,6 +1318,7 @@ export class FleetService {
         throw new Error(`Home "${homeId}" not found after mate reset.`);
       }
     } catch (error) {
+      this.mateWorktreeIntegrationFollowUp.delete(homeId);
       const discarded = await this.discardBbMateThread(thread.id);
       const detail = error instanceof Error ? error.message : String(error);
       const discardNote = discarded
