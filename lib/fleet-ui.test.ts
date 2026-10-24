@@ -7,9 +7,10 @@ import {
   fleetPanelFromSubPath,
   fleetSteerPayload,
   inboxReplySteerText,
-  mobileTreeDrawerHidden,
+  findFleetTreeNode,
   needsDecisionRailLine,
 } from "./fleet-ui";
+import type { TreeNode } from "./types";
 
 describe("fleetPanelFromSubPath (P-H11)", () => {
   it("opens inbox tab from /fleet/inbox deep link", () => {
@@ -69,10 +70,54 @@ describe("Fleet UI panel actions (P-U12, P-U13)", () => {
   });
 });
 
-describe("mobileTreeDrawerHidden (P-U8)", () => {
-  it("hides drawer on small screens when closed", () => {
-    assert.equal(mobileTreeDrawerHidden(false), "max-md:hidden");
-    assert.equal(mobileTreeDrawerHidden(true), "");
+describe("findFleetTreeNode", () => {
+  const tree: TreeNode[] = [
+    {
+      id: "m",
+      homeId: "tech",
+      parentId: null,
+      envId: null,
+      createdAtMs: 1,
+      depth: 0,
+      threadId: "thr_mate",
+      label: "mate",
+      kind: "primary",
+      role: null,
+      fsmState: "idle",
+      liveness: null,
+      deliveryMode: "no-mistakes",
+      yolo: false,
+      dispatchProfileId: null,
+      profileLabel: null,
+      prUrl: null,
+      children: [
+        {
+          id: "c",
+          homeId: "tech",
+          parentId: "m",
+          envId: null,
+          createdAtMs: 2,
+          depth: 1,
+          threadId: "thr_crew",
+          label: "crew",
+          kind: "crew",
+          role: "ship",
+          fsmState: "working",
+          liveness: "alive",
+          deliveryMode: "no-mistakes",
+          yolo: false,
+          dispatchProfileId: null,
+          profileLabel: null,
+          prUrl: null,
+          children: [],
+        },
+      ],
+    },
+  ];
+
+  it("finds nested nodes by thread id", () => {
+    assert.equal(findFleetTreeNode(tree, "thr_crew")?.label, "crew");
+    assert.equal(findFleetTreeNode(tree, "missing"), null);
   });
 });
 

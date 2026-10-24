@@ -1,5 +1,7 @@
 /** Pure Fleet panel routing and copy helpers (P-H11, P-H14, P-U8). */
 
+import type { TreeNode } from "./types";
+
 export type FleetTab = "fleet" | "inbox" | "board" | "homes";
 
 export const FLEET_REALTIME_TOPIC = "fleet-changed";
@@ -33,9 +35,17 @@ export function needsDecisionRailLine(
   return `Needs decision: ${primary} (+${holds.length - 1})`;
 }
 
-/** Tailwind classes for mobile tree drawer visibility (P-U8). */
-export function mobileTreeDrawerHidden(treeOpen: boolean): string {
-  return treeOpen ? "" : "max-md:hidden";
+/** Find a fleet tree node by BB thread id. */
+export function findFleetTreeNode(
+  tree: readonly TreeNode[],
+  threadId: string,
+): TreeNode | null {
+  for (const node of tree) {
+    if (node.threadId === threadId) return node;
+    const child = findFleetTreeNode(node.children, threadId);
+    if (child) return child;
+  }
+  return null;
 }
 
 export type FleetOverflowAction =

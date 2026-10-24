@@ -84,7 +84,7 @@ bb plugin reload firstmate-control-plane
    bb fleet integration check --mate <homeId>
    ```
 
-3. Open **Fleet** in the BB sidebar (Ship icon). Select your home, use **Tree + Chat**, **Inbox**, or **Board**.
+3. Open **Fleet** in the BB sidebar (Ship icon). The crew **tree** replaces the thread list while Fleet is open; select your home and use **Tree + Chat**, **Inbox**, or **Board** in the main panel.
 
 Crew threads are created when the **mate** delegates work (CLI / spawn skill / `bb fleet spawn`); the panel does not include a manual “spawn crew” form.
 
