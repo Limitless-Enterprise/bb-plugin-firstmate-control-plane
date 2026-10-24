@@ -22,18 +22,6 @@ export function FleetSidebarTree({ subPath }: { subPath?: string }) {
     return threadId;
   }, [subPath]);
 
-  const refetchHomes = useCallback(() => {
-    rpc
-      .call("listHomes", null)
-      .then((result) => {
-        setHomes(result.homes);
-        setSelectedHomeId(result.selectedHomeId);
-      })
-      .catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : String(cause)),
-      );
-  }, [rpc]);
-
   const refetchTree = useCallback(
     (homeId: string | null) => {
       if (!homeId) {
@@ -50,6 +38,19 @@ export function FleetSidebarTree({ subPath }: { subPath?: string }) {
     [rpc],
   );
 
+  const refetchHomes = useCallback(() => {
+    rpc
+      .call("listHomes", null)
+      .then((result) => {
+        setHomes(result.homes);
+        setSelectedHomeId(result.selectedHomeId);
+        refetchTree(result.selectedHomeId);
+      })
+      .catch((cause: unknown) =>
+        setError(cause instanceof Error ? cause.message : String(cause)),
+      );
+  }, [rpc, refetchTree]);
+
   useEffect(() => {
     refetchHomes();
   }, [refetchHomes]);
@@ -60,7 +61,6 @@ export function FleetSidebarTree({ subPath }: { subPath?: string }) {
 
   useRealtime(FLEET_REALTIME_TOPIC, () => {
     refetchHomes();
-    refetchTree(selectedHomeId);
   });
 
   const selectThread = (threadId: string) => {
@@ -91,7 +91,6 @@ export function FleetSidebarTree({ subPath }: { subPath?: string }) {
         onReset={(mateThreadId) => {
           selectThread(mateThreadId);
           refetchHomes();
-          refetchTree(selectedHomeId);
         }}
       />
       {tree.length === 0 ? (
