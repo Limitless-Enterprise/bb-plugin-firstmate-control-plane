@@ -17,6 +17,7 @@ export function FleetSidebarTree({ subPath }: { subPath?: string }) {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [error, setError] = useState<string | null>(null);
   const treeRequestHomeId = useRef<string | null>(null);
+  const homesRequestId = useRef(0);
 
   const selectedThreadId = useMemo(() => {
     const { threadId } = fleetPanelFromSubPath(subPath);
@@ -53,10 +54,16 @@ export function FleetSidebarTree({ subPath }: { subPath?: string }) {
   );
 
   const refetchHomes = useCallback(() => {
+    const requestId = ++homesRequestId.current;
     setError(null);
+    treeRequestHomeId.current = null;
+    setTree([]);
     rpc
       .call("listHomes", null)
       .then((result) => {
+        if (homesRequestId.current !== requestId) {
+          return;
+        }
         setHomes(result.homes);
         setSelectedHomeId(result.selectedHomeId);
         refetchTree(result.selectedHomeId);

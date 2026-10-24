@@ -397,12 +397,12 @@ function FleetPage({ subPath }: { subPath?: string }) {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [badge, setBadge] = useState({ count: 0, wakes: 0, dead: 0 });
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("fleet");
   const [error, setError] = useState<string | null>(null);
   const [inboxKind, setInboxKind] = useState<InboxKindFilter>("all");
   const treeRequestHomeId = useRef<string | null>(null);
   const inboxRequestKey = useRef<string | null>(null);
+  const homesRequestId = useRef(0);
   const selectedHomeIdRef = useRef(selectedHomeId);
   selectedHomeIdRef.current = selectedHomeId;
 
@@ -439,9 +439,13 @@ function FleetPage({ subPath }: { subPath?: string }) {
   );
 
   const refetch = useCallback(() => {
+    const requestId = ++homesRequestId.current;
     rpc
       .call("listHomes", null)
       .then((result) => {
+        if (homesRequestId.current !== requestId) {
+          return;
+        }
         setHomes(result.homes);
         setSelectedHomeId(result.selectedHomeId);
         refetchHome(result.selectedHomeId);
@@ -466,10 +470,12 @@ function FleetPage({ subPath }: { subPath?: string }) {
     refetch();
   });
 
+  const selectedThreadId = useMemo(() => {
+    return fleetPanelFromSubPath(subPath).threadId;
+  }, [subPath]);
+
   useEffect(() => {
-    const { tab, threadId } = fleetPanelFromSubPath(subPath);
-    setTab(tab);
-    if (threadId) setSelectedThreadId(threadId);
+    setTab(fleetPanelFromSubPath(subPath).tab);
   }, [subPath]);
 
   const openHolds = useMemo(
@@ -482,12 +488,10 @@ function FleetPage({ subPath }: { subPath?: string }) {
     if (fleetPanelFromSubPath(subPath).threadId) {
       navigate.toPluginPanel("fleet", {});
     }
-    setSelectedThreadId(null);
     refetch();
   };
 
   const selectThread = (threadId: string) => {
-    setSelectedThreadId(threadId);
     setTab("fleet");
     navigate.toPluginPanel("fleet", { subPath: `thread/${threadId}` });
   };
