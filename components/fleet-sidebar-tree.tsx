@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../contract";
 import type { Home, TreeNode } from "../lib/types";
@@ -16,6 +16,7 @@ export function FleetSidebarTree({ subPath }: { subPath?: string }) {
   const [selectedHomeId, setSelectedHomeId] = useState<string | null>(null);
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const treeRequestHomeId = useRef<string | null>(null);
 
   const selectedThreadId = useMemo(() => {
     const { threadId } = fleetPanelFromSubPath(subPath);
@@ -25,15 +26,25 @@ export function FleetSidebarTree({ subPath }: { subPath?: string }) {
   const refetchTree = useCallback(
     (homeId: string | null) => {
       if (!homeId) {
+        treeRequestHomeId.current = null;
         setTree([]);
         return;
       }
+      treeRequestHomeId.current = homeId;
       rpc
         .call("getTree", { homeId })
-        .then((result) => setTree(result.tree))
-        .catch((cause: unknown) =>
-          setError(cause instanceof Error ? cause.message : String(cause)),
-        );
+        .then((result) => {
+          if (treeRequestHomeId.current !== homeId) {
+            return;
+          }
+          setTree(result.tree);
+        })
+        .catch((cause: unknown) => {
+          if (treeRequestHomeId.current !== homeId) {
+            return;
+          }
+          setError(cause instanceof Error ? cause.message : String(cause));
+        });
     },
     [rpc],
   );
@@ -54,10 +65,6 @@ export function FleetSidebarTree({ subPath }: { subPath?: string }) {
   useEffect(() => {
     refetchHomes();
   }, [refetchHomes]);
-
-  useEffect(() => {
-    refetchTree(selectedHomeId);
-  }, [selectedHomeId, refetchTree]);
 
   useRealtime(FLEET_REALTIME_TOPIC, () => {
     refetchHomes();
