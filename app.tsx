@@ -402,11 +402,15 @@ function FleetPage({ subPath }: { subPath?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [inboxKind, setInboxKind] = useState<InboxKindFilter>("all");
   const treeRequestHomeId = useRef<string | null>(null);
+  const inboxRequestKey = useRef<string | null>(null);
+  const selectedHomeIdRef = useRef(selectedHomeId);
+  selectedHomeIdRef.current = selectedHomeId;
 
   const refetchHome = useCallback(
     (homeId: string | null) => {
       if (!homeId) {
         treeRequestHomeId.current = null;
+        inboxRequestKey.current = null;
         setTree([]);
         setInbox([]);
         return;
@@ -420,9 +424,16 @@ function FleetPage({ subPath }: { subPath?: string }) {
           }
           setTree(result.tree);
         });
+      const inboxKey = `${homeId}:${inboxKind}`;
+      inboxRequestKey.current = inboxKey;
       rpc
         .call("listInbox", { homeId, state: "open", kind: inboxKind })
-        .then((result) => setInbox(result.items));
+        .then((result) => {
+          if (inboxRequestKey.current !== inboxKey) {
+            return;
+          }
+          setInbox(result.items);
+        });
     },
     [rpc, inboxKind],
   );
@@ -446,8 +457,10 @@ function FleetPage({ subPath }: { subPath?: string }) {
   }, [refetch]);
 
   useEffect(() => {
-    refetchHome(selectedHomeId);
-  }, [selectedHomeId, refetchHome]);
+    const homeId = selectedHomeIdRef.current;
+    if (!homeId) return;
+    refetchHome(homeId);
+  }, [inboxKind, refetchHome]);
 
   useRealtime(FLEET_REALTIME_TOPIC, () => {
     refetch();
@@ -466,8 +479,11 @@ function FleetPage({ subPath }: { subPath?: string }) {
 
   const selectHome = async (homeId: string) => {
     await rpc.call("selectHome", { homeId });
-    setSelectedHomeId(homeId);
+    if (fleetPanelFromSubPath(subPath).threadId) {
+      navigate.toPluginPanel("fleet", {});
+    }
     setSelectedThreadId(null);
+    refetch();
   };
 
   const selectThread = (threadId: string) => {
@@ -546,7 +562,7 @@ function FleetPage({ subPath }: { subPath?: string }) {
             onClick={() => setTab(name)}
           >
             {name === "fleet"
-              ? "Tree + Chat"
+              ? "Chat"
               : name === "inbox"
                 ? "Inbox"
                 : name === "board"
