@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   definePluginApp,
   ThreadChat,
@@ -401,6 +401,31 @@ function FleetPage({ subPath }: { subPath?: string }) {
   const [tab, setTab] = useState<Tab>("fleet");
   const [error, setError] = useState<string | null>(null);
   const [inboxKind, setInboxKind] = useState<InboxKindFilter>("all");
+  const treeRequestHomeId = useRef<string | null>(null);
+
+  const refetchHome = useCallback(
+    (homeId: string | null) => {
+      if (!homeId) {
+        treeRequestHomeId.current = null;
+        setTree([]);
+        setInbox([]);
+        return;
+      }
+      treeRequestHomeId.current = homeId;
+      rpc
+        .call("getTree", { homeId })
+        .then((result) => {
+          if (treeRequestHomeId.current !== homeId) {
+            return;
+          }
+          setTree(result.tree);
+        });
+      rpc
+        .call("listInbox", { homeId, state: "open", kind: inboxKind })
+        .then((result) => setInbox(result.items));
+    },
+    [rpc, inboxKind],
+  );
 
   const refetch = useCallback(() => {
     rpc
@@ -408,27 +433,13 @@ function FleetPage({ subPath }: { subPath?: string }) {
       .then((result) => {
         setHomes(result.homes);
         setSelectedHomeId(result.selectedHomeId);
+        refetchHome(result.selectedHomeId);
       })
       .catch((cause: unknown) =>
         setError(cause instanceof Error ? cause.message : String(cause)),
       );
     rpc.call("inboxBadge", null).then((result) => setBadge(result));
-  }, [rpc]);
-
-  const refetchHome = useCallback(
-    (homeId: string | null) => {
-      if (!homeId) {
-        setTree([]);
-        setInbox([]);
-        return;
-      }
-      rpc.call("getTree", { homeId }).then((result) => setTree(result.tree));
-      rpc
-        .call("listInbox", { homeId, state: "open", kind: inboxKind })
-        .then((result) => setInbox(result.items));
-    },
-    [rpc, inboxKind],
-  );
+  }, [rpc, refetchHome]);
 
   useEffect(() => {
     refetch();
@@ -440,7 +451,6 @@ function FleetPage({ subPath }: { subPath?: string }) {
 
   useRealtime(FLEET_REALTIME_TOPIC, () => {
     refetch();
-    refetchHome(selectedHomeId);
   });
 
   useEffect(() => {

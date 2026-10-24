@@ -28,9 +28,11 @@ export function FleetSidebarTree({ subPath }: { subPath?: string }) {
       if (!homeId) {
         treeRequestHomeId.current = null;
         setTree([]);
+        setError(null);
         return;
       }
       treeRequestHomeId.current = homeId;
+      setError(null);
       rpc
         .call("getTree", { homeId })
         .then((result) => {
@@ -38,6 +40,7 @@ export function FleetSidebarTree({ subPath }: { subPath?: string }) {
             return;
           }
           setTree(result.tree);
+          setError(null);
         })
         .catch((cause: unknown) => {
           if (treeRequestHomeId.current !== homeId) {
@@ -50,6 +53,7 @@ export function FleetSidebarTree({ subPath }: { subPath?: string }) {
   );
 
   const refetchHomes = useCallback(() => {
+    setError(null);
     rpc
       .call("listHomes", null)
       .then((result) => {
