@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Live P-U19 / P-SYNC checks against a running BB + Fleet plugin (tech mate home).
-# Uses the same RPC transport as the Fleet Tree UI (`bb plugin rpc call`).
+# Uses the same RPC transport as the Fleet sidebar tree UI (`bb plugin rpc call`).
 set -euo pipefail
 
 BB="${BB_CLI:-bb}"
@@ -38,8 +38,13 @@ echo "=== P-U19 live RPC (mate=$MATE FM_HOME=$FM_HOME) ==="
 "$BB" fleet sweep --mate "$MATE" >/dev/null 2>&1 || true
 
 preflight=$(rpc resetMateThreadPreflight)
-if echo "$preflight" | jq -e '.allowed == true' >/dev/null 2>&1; then
+baseline_open=$(echo "$preflight" | jq -r '.openChildren | length' 2>/dev/null || echo -1)
+if [ "$baseline_open" = -1 ]; then
+  record P-U19-preflight-empty fail "$preflight"
+elif [ "$baseline_open" -eq 0 ] && echo "$preflight" | jq -e '.allowed == true' >/dev/null 2>&1; then
   record P-U19-preflight-empty pass "preflight allowed with no open crews"
+elif [ "$baseline_open" -gt 0 ] && echo "$preflight" | jq -e '.allowed == false and (.openChildren | length) == '"$baseline_open" >/dev/null 2>&1; then
+  record P-U19-preflight-empty pass "preflight blocked with $baseline_open open crews (baseline home)"
 else
   record P-U19-preflight-empty fail "$preflight"
 fi
@@ -70,8 +75,13 @@ else
   "$BB" fleet sweep --mate "$MATE" >/dev/null 2>&1 || true
   sleep 1
   allowed=$(rpc resetMateThreadPreflight)
-  if echo "$allowed" | jq -e '.allowed == true' >/dev/null 2>&1; then
+  after_open=$(echo "$allowed" | jq -r '.openChildren | length' 2>/dev/null || echo -1)
+  if [ "$after_open" = -1 ]; then
+    record P-U19-archived-allow fail "$allowed"
+  elif [ "$after_open" -eq "$baseline_open" ] && [ "$baseline_open" -eq 0 ] && echo "$allowed" | jq -e '.allowed == true' >/dev/null 2>&1; then
     record P-U19-archived-allow pass "preflight allowed after crew archived"
+  elif [ "$after_open" -eq "$baseline_open" ] && [ "$baseline_open" -gt 0 ] && echo "$allowed" | jq -e '.allowed == false' >/dev/null 2>&1; then
+    record P-U19-archived-allow pass "preflight restored baseline ($baseline_open open crews) after test crew archived"
   else
     record P-U19-archived-allow fail "$allowed"
   fi

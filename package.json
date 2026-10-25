@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-firstmate-control-plane",
-  "version": "2026.9.0",
+  "version": "2026.10.0",
   "license": "Apache-2.0",
   "description": "BB plugin: Firstmate Fleet control plane (mate homes, crews, inbox, supervision).",
   "repository": {
@@ -18,11 +18,14 @@
   "type": "module",
   "engines": {
     "bb": ">=0.43",
-    "bbPluginSdk": ">=0.4.104"
+    "bbPluginSdk": ">=0.6.53"
   },
   "packageManager": "pnpm@10.13.1",
   "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3", "esbuild"]
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
   },
   "bb": {
     "name": "Fleet",
@@ -32,7 +35,9 @@
     },
     "server": "./server.ts",
     "app": "./app.tsx",
-    "skills": ["skills"]
+    "skills": [
+      "skills"
+    ]
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "4.1.3",
@@ -47,7 +52,7 @@
     "build": "bb plugin build ."
   },
   "devDependencies": {
-    "@get-bb/plugin-sdk": "0.4.104",
+    "@get-bb/plugin-sdk": "0.6.79",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",

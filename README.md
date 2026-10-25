@@ -28,10 +28,10 @@ Optional CLI tools on mate worktrees after integration apply: `bb`, `jq` (see ov
 
 ### From Git (recommended for end users)
 
-After a stable release tag exists (CalVer, for example `v2026.9.0`):
+After a stable release tag exists (CalVer, for example `v2026.10.0`):
 
 ```sh
-bb plugin install git:github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane@^2026.9.0 --yes
+bb plugin install git:github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane@^2026.10.0 --yes
 ```
 
 Track `main` before the first tag:
@@ -84,7 +84,7 @@ bb plugin reload firstmate-control-plane
    bb fleet integration check --mate <homeId>
    ```
 
-3. Open **Fleet** in the BB sidebar (Ship icon). Select your home, use **Tree + Chat**, **Inbox**, or **Board**.
+3. Open **Fleet** in the BB sidebar (Ship icon). The crew **tree** replaces the thread list while Fleet is open; select your home and use **Chat**, **Inbox**, or **Board** in the main panel.
 
 Crew threads are created when the **mate** delegates work (CLI / spawn skill / `bb fleet spawn`); the panel does not include a manual “spawn crew” form.
 
@@ -96,7 +96,7 @@ Route prefix: plugin panel **`fleet`** (deep links below).
 
 | Area | What it does |
 | --- | --- |
-| **Tree + Chat** | Mate/crew tree, **New mate thread** (RPC reset when no open crew threads), thread chat, steer; overflow: interrupt, exit, relaunch, detach |
+| **Chat** | Crew tree in the sidebar; **New mate thread** (RPC reset when no open crew threads), thread chat, steer; overflow: interrupt, exit, relaunch, detach |
 | **Inbox** | Holds, wakes, liveness, stalls, PR signals — resolve, snooze, reply-with-steer |
 | **Board** | Columns by FSM state (working, blocked, idle, done, failed) |
 | **Homes** | Create/select mate homes |
@@ -172,7 +172,7 @@ export MATE=<homeId>
 ./scripts/m1-ac-full.sh
 ```
 
-Mate reset and meta close-out RPC checks (running BB + installed plugin; same transport as Fleet Tree UI):
+Mate reset and meta close-out RPC checks (running BB + installed plugin; same transport as the Fleet sidebar tree UI):
 
 ```sh
 export MATE=<homeId>
@@ -185,7 +185,7 @@ export BB_CLI=bb   # or rely on scripts/resolve-bb-cli.sh
 ## Architecture (short)
 
 - **Plugin server** (`server.ts`): RPC for panel, SQLite fleet state, background services (supervisor, PR poller, status bridge).
-- **Panel** (`app.tsx`): React UI registered on BB `navPanel` slot `fleet`.
+- **Panel** (`app.tsx`): React UI on BB `navPanel` slot `fleet`; crew tree via `experimental_sidebar` (`FleetSidebarTree`) while Fleet is open; main panel is chat, inbox, board, and homes.
 - **CLI**: `bb fleet` command registered by the plugin.
 - **Overlay**: Optional Firstmate backend wrap under `packages/bb-backend/overlay/` applied into mate checkouts.
 

@@ -71,8 +71,8 @@ profiles:
 
 ## Crew spawn (`bb fleet spawn`)
 
-- The Fleet panel does not expose a manual spawn form; an empty tree shows
-  mate-dispatch guidance. Crews appear when the mate checkout runs native
+- The Fleet main panel does not expose a manual spawn form; an empty sidebar
+  crew tree shows mate-dispatch guidance. Crews appear when the mate checkout runs native
   `fm-spawn` (overlay → `bb fleet spawn`) or when an operator uses CLI.
 - `threads.spawn` uses mate default `providerId` and `model` from plugin settings
   when no profile applies. `--profile <id>` selects a home dispatch profile;
@@ -207,8 +207,8 @@ while switching rows; the composer stays open until steer succeeds or shows an e
 `{ inbox, wakes, dead }` for sidebar badges when scoped to a home. `inboxBadge`:
 with a selected home, returns `count` / `wakes` / `dead` from `fleetNavCounts`
 for that home; with no home selected, sums those three fields from
-`fleetNavCounts` across every registered home. **Mate thread reset** (Tree UI only,
-no CLI): `resetMateThreadPreflight` returns `{ allowed, openChildren, mateThreadId,
+`fleetNavCounts` across every registered home. **Mate thread reset** (Fleet sidebar
+tree UI only, no CLI): `resetMateThreadPreflight` returns `{ allowed, openChildren, mateThreadId,
 mateLabel }` after checking BB archive state for each non-primary node (legacy
 `legacy:*` thread ids are ignored; `threads.get` failure fail-closes as blocking).
 `resetMateThread` spawns the replacement mate, stops/archives the previous mate

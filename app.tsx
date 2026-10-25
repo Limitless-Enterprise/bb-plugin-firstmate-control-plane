@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   definePluginApp,
   ThreadChat,
@@ -8,20 +8,20 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "./contract";
 import type { Home, InboxItem, TreeNode } from "./lib/types";
-import { MateThreadResetControl } from "@/components/mate-thread-reset";
+import { FleetSidebarTree } from "@/components/fleet-sidebar-tree";
 import { FleetSettingsSection } from "@/components/fleet-settings";
+import { StatusDot } from "@/components/fleet-tree-rows";
 import { HomesPanel } from "@/components/homes-panel";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
 
 import {
   FLEET_REALTIME_TOPIC,
   fleetOverflowRpcCall,
+  findFleetTreeNode,
   fleetPanelFromSubPath,
   fleetSteerPayload,
   inboxReplySteerText,
-  mobileTreeDrawerHidden,
   needsDecisionRailLine,
 } from "./lib/fleet-ui";
 import {
@@ -30,100 +30,6 @@ import {
 } from "./lib/fleet-inbox-filters";
 
 type Tab = "fleet" | "inbox" | "board" | "homes";
-
-function fsmColor(state: string): string {
-  switch (state) {
-    case "working":
-      return "bg-blue-500";
-    case "blocked":
-      return "bg-amber-500";
-    case "done":
-      return "bg-emerald-500";
-    case "error":
-    case "stopped":
-      return "bg-red-500";
-    case "unknown":
-      return "bg-purple-500";
-    default:
-      return "bg-muted-foreground/40";
-  }
-}
-
-function livenessPip(verdict: string | null): string | null {
-  if (!verdict || verdict === "alive") return null;
-  if (verdict === "ambiguous") return "bg-purple-400";
-  return "bg-red-500";
-}
-
-function StatusDot({
-  fsmState,
-  liveness,
-}: {
-  fsmState: string;
-  liveness: string | null;
-}) {
-  const pip = livenessPip(liveness);
-  return (
-    <span className="relative inline-flex size-2.5 shrink-0">
-      <span className={cn("size-2.5 rounded-full", fsmColor(fsmState))} />
-      {pip ? (
-        <span
-          className={cn(
-            "absolute -right-0.5 -top-0.5 size-1.5 rounded-full ring-1 ring-background",
-            pip,
-          )}
-        />
-      ) : null}
-    </span>
-  );
-}
-
-function RailRow({
-  node,
-  selectedThreadId,
-  onSelect,
-  depth = 0,
-}: {
-  node: TreeNode;
-  selectedThreadId: string | null;
-  onSelect: (threadId: string) => void;
-  depth?: number;
-}) {
-  const selected = selectedThreadId === node.threadId;
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => onSelect(node.threadId)}
-        className={cn(
-          "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-state-hover",
-          selected && "bg-state-hover",
-        )}
-        style={{ paddingLeft: `${8 + depth * 14}px` }}
-      >
-        <StatusDot fsmState={node.fsmState} liveness={node.liveness} />
-        <span className="min-w-0 flex-1 truncate font-medium">{node.label}</span>
-        {node.role ? (
-          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
-            {node.role}
-          </span>
-        ) : null}
-        {node.kind === "secondmate" ? (
-          <span className="shrink-0 text-[10px] text-muted-foreground">lead</span>
-        ) : null}
-      </button>
-      {node.children.map((child: TreeNode) => (
-        <RailRow
-          key={child.id}
-          node={child}
-          selectedThreadId={selectedThreadId}
-          onSelect={onSelect}
-          depth={depth + 1}
-        />
-      ))}
-    </>
-  );
-}
 
 function BoardLane({
   title,
@@ -333,15 +239,6 @@ function InboxList({
   );
 }
 
-function findNode(tree: TreeNode[], threadId: string): TreeNode | null {
-  for (const node of tree) {
-    if (node.threadId === threadId) return node;
-    const child = findNode(node.children, threadId);
-    if (child) return child;
-  }
-  return null;
-}
-
 function ThreadControls({
   homeId,
   node,
@@ -500,57 +397,90 @@ function FleetPage({ subPath }: { subPath?: string }) {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [badge, setBadge] = useState({ count: 0, wakes: 0, dead: 0 });
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("fleet");
   const [error, setError] = useState<string | null>(null);
-  const [treeOpen, setTreeOpen] = useState(false);
   const [inboxKind, setInboxKind] = useState<InboxKindFilter>("all");
-
-  const refetch = useCallback(() => {
-    rpc
-      .call("listHomes", null)
-      .then((result) => {
-        setHomes(result.homes);
-        setSelectedHomeId(result.selectedHomeId);
-      })
-      .catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : String(cause)),
-      );
-    rpc.call("inboxBadge", null).then((result) => setBadge(result));
-  }, [rpc]);
+  const treeRequestHomeId = useRef<string | null>(null);
+  const inboxRequestKey = useRef<string | null>(null);
+  const homesRequestId = useRef(0);
+  const selectedHomeIdRef = useRef(selectedHomeId);
+  selectedHomeIdRef.current = selectedHomeId;
 
   const refetchHome = useCallback(
     (homeId: string | null) => {
       if (!homeId) {
+        treeRequestHomeId.current = null;
+        inboxRequestKey.current = null;
         setTree([]);
         setInbox([]);
         return;
       }
-      rpc.call("getTree", { homeId }).then((result) => setTree(result.tree));
+      treeRequestHomeId.current = homeId;
+      setTree([]);
+      setInbox([]);
+      rpc
+        .call("getTree", { homeId })
+        .then((result) => {
+          if (treeRequestHomeId.current !== homeId) {
+            return;
+          }
+          setTree(result.tree);
+        });
+      const inboxKey = `${homeId}:${inboxKind}`;
+      inboxRequestKey.current = inboxKey;
       rpc
         .call("listInbox", { homeId, state: "open", kind: inboxKind })
-        .then((result) => setInbox(result.items));
+        .then((result) => {
+          if (inboxRequestKey.current !== inboxKey) {
+            return;
+          }
+          setInbox(result.items);
+        });
     },
     [rpc, inboxKind],
   );
+
+  const refetch = useCallback(() => {
+    const requestId = ++homesRequestId.current;
+    rpc
+      .call("listHomes", null)
+      .then((result) => {
+        if (homesRequestId.current !== requestId) {
+          return;
+        }
+        setHomes(result.homes);
+        setSelectedHomeId(result.selectedHomeId);
+        refetchHome(result.selectedHomeId);
+      })
+      .catch((cause: unknown) => {
+        if (homesRequestId.current !== requestId) {
+          return;
+        }
+        setError(cause instanceof Error ? cause.message : String(cause));
+      });
+    rpc.call("inboxBadge", null).then((result) => setBadge(result));
+  }, [rpc, refetchHome]);
 
   useEffect(() => {
     refetch();
   }, [refetch]);
 
   useEffect(() => {
-    refetchHome(selectedHomeId);
-  }, [selectedHomeId, refetchHome]);
+    const homeId = selectedHomeIdRef.current;
+    if (!homeId) return;
+    refetchHome(homeId);
+  }, [inboxKind, refetchHome]);
 
   useRealtime(FLEET_REALTIME_TOPIC, () => {
     refetch();
-    refetchHome(selectedHomeId);
   });
 
+  const selectedThreadId = useMemo(() => {
+    return fleetPanelFromSubPath(subPath).threadId;
+  }, [subPath]);
+
   useEffect(() => {
-    const { tab, threadId } = fleetPanelFromSubPath(subPath);
-    setTab(tab);
-    if (threadId) setSelectedThreadId(threadId);
+    setTab(fleetPanelFromSubPath(subPath).tab);
   }, [subPath]);
 
   const openHolds = useMemo(
@@ -560,19 +490,20 @@ function FleetPage({ subPath }: { subPath?: string }) {
 
   const selectHome = async (homeId: string) => {
     await rpc.call("selectHome", { homeId });
-    setSelectedHomeId(homeId);
-    setSelectedThreadId(null);
+    if (fleetPanelFromSubPath(subPath).threadId) {
+      navigate.toPluginPanel("fleet", {});
+    }
+    refetch();
   };
 
   const selectThread = (threadId: string) => {
-    setSelectedThreadId(threadId);
     setTab("fleet");
-    setTreeOpen(false);
     navigate.toPluginPanel("fleet", { subPath: `thread/${threadId}` });
   };
 
   const selectedNode = useMemo(
-    () => (selectedThreadId ? findNode(tree, selectedThreadId) : null),
+    () =>
+      selectedThreadId ? findFleetTreeNode(tree, selectedThreadId) : null,
     [tree, selectedThreadId],
   );
 
@@ -640,7 +571,7 @@ function FleetPage({ subPath }: { subPath?: string }) {
             onClick={() => setTab(name)}
           >
             {name === "fleet"
-              ? "Tree + Chat"
+              ? "Chat"
               : name === "inbox"
                 ? "Inbox"
                 : name === "board"
@@ -714,79 +645,30 @@ function FleetPage({ subPath }: { subPath?: string }) {
           ))}
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 md:grid-cols-[240px_minmax(0,1fr)]">
-          <aside
-            className={cn(
-              "min-h-0 overflow-y-auto border-r border-border p-2",
-              "max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-20 max-md:w-[min(280px,85vw)] max-md:bg-background max-md:shadow-lg",
-              !treeOpen && mobileTreeDrawerHidden(treeOpen),
-            )}
-          >
-            {selectedHomeId ? (
-              <MateThreadResetControl
-                homeId={selectedHomeId}
-                mateLabel={
-                  homes.find((home) => home.homeId === selectedHomeId)?.label ??
-                  selectedHomeId
-                }
-                rpc={rpc}
-                onReset={(mateThreadId) => {
-                  selectThread(mateThreadId);
-                  refetch();
-                  refetchHome(selectedHomeId);
-                }}
+        <div className="flex min-h-0 flex-1 flex-col">
+          {selectedNode && selectedHomeId ? (
+            <ThreadControls
+              homeId={selectedHomeId}
+              node={selectedNode}
+              rpc={rpc}
+              onChanged={() => refetchHome(selectedHomeId)}
+            />
+          ) : null}
+          <div className="min-h-0 flex-1">
+            {selectedThreadId ? (
+              <ThreadChat
+                threadId={selectedThreadId}
+                variant="compact"
+                layout="contained"
+                permissionPolicy="editable"
+                className="h-full min-h-0"
               />
-            ) : null}
-            {tree.length === 0 ? (
-              <p className="px-2 py-4 text-sm text-muted-foreground">
-                No crews in the tree yet. The mate thread dispatches ship, scout,
-                and secondmate threads when work is delegated.
-              </p>
             ) : (
-              tree.map((node) => (
-                <RailRow
-                  key={node.id}
-                  node={node}
-                  selectedThreadId={selectedThreadId}
-                  onSelect={selectThread}
-                />
-              ))
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                Select a mate or crew in the sidebar tree to open chat.
+              </div>
             )}
-          </aside>
-          <main className="flex min-h-0 flex-col">
-            <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1 md:hidden">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setTreeOpen((open) => !open)}
-              >
-                {treeOpen ? "Hide tree" : "Show tree"}
-              </Button>
-            </div>
-            {selectedNode && selectedHomeId ? (
-              <ThreadControls
-                homeId={selectedHomeId}
-                node={selectedNode}
-                rpc={rpc}
-                onChanged={() => refetchHome(selectedHomeId)}
-              />
-            ) : null}
-            <div className="min-h-0 flex-1">
-              {selectedThreadId ? (
-                <ThreadChat
-                  threadId={selectedThreadId}
-                  variant="compact"
-                  layout="contained"
-                  permissionPolicy="editable"
-                  className="h-full min-h-0"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                  Select a mate or crew to open chat.
-                </div>
-              )}
-            </div>
-          </main>
+          </div>
         </div>
       )}
     </div>
@@ -808,5 +690,6 @@ export default definePluginApp((app) => {
     icon: "./assets/icon.svg",
     path: "fleet",
     component: FleetPage,
+    experimental_sidebar: FleetSidebarTree,
   });
 });

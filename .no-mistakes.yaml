@@ -13,7 +13,7 @@ test:
   instructions: |
     Baseline command runs `pnpm test` (unit + bb-backend/spawn-wrap/fm-teardown shell contracts).
     When `scripts/resolve-bb-cli.sh` finds bb, `scripts/no-mistakes-test-live.sh` runs
-    `scripts/p-u19-live-rpc.sh` (live RPC — same transport as the Fleet Tree UI).
+    `scripts/p-u19-live-rpc.sh` (live RPC — same transport as the Fleet sidebar tree UI).
 
     For the scenario table in your test report, use this compact shape (do not duplicate
     14+ operator rows that only repeat lib/*.test.ts with live=false — the analyzer
@@ -23,7 +23,7 @@ test:
        (mate reset, meta sync, sweep, archive sync, fm-teardown contract via pnpm test).
     2. **Live P-U19 RPC script** — one row per check ID from p-u19-live-rpc.sh when the script
        ran; result pass/fail, live=true, evidence=script stdout.
-    3. **Manual / out of gate** — Tree UI click path and preflight Retry UX only; result skip
+    3. **Manual / out of gate** — sidebar tree UI click path and preflight Retry UX only; result skip
        (not untested), reason=requires BB plugin renderer session.
 
     Omit adversarial paths already covered by lib/fleet-mate-reset.test.ts unless you add a new

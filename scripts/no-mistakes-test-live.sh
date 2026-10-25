@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Optional live layer for no-mistakes test step (same RPC as Fleet Tree UI).
+# Optional live layer for no-mistakes test step (same RPC as Fleet sidebar tree UI).
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
