@@ -68,9 +68,12 @@ export function FleetSidebarTree({ subPath }: { subPath?: string }) {
         setSelectedHomeId(result.selectedHomeId);
         refetchTree(result.selectedHomeId);
       })
-      .catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : String(cause)),
-      );
+      .catch((cause: unknown) => {
+        if (homesRequestId.current !== requestId) {
+          return;
+        }
+        setError(cause instanceof Error ? cause.message : String(cause));
+      });
   }, [rpc, refetchTree]);
 
   useEffect(() => {

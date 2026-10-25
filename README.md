@@ -84,7 +84,7 @@ bb plugin reload firstmate-control-plane
    bb fleet integration check --mate <homeId>
    ```
 
-3. Open **Fleet** in the BB sidebar (Ship icon). The crew **tree** replaces the thread list while Fleet is open; select your home and use **Tree + Chat**, **Inbox**, or **Board** in the main panel.
+3. Open **Fleet** in the BB sidebar (Ship icon). The crew **tree** replaces the thread list while Fleet is open; select your home and use **Chat**, **Inbox**, or **Board** in the main panel.
 
 Crew threads are created when the **mate** delegates work (CLI / spawn skill / `bb fleet spawn`); the panel does not include a manual “spawn crew” form.
 
@@ -96,7 +96,7 @@ Route prefix: plugin panel **`fleet`** (deep links below).
 
 | Area | What it does |
 | --- | --- |
-| **Tree + Chat** | Mate/crew tree, **New mate thread** (RPC reset when no open crew threads), thread chat, steer; overflow: interrupt, exit, relaunch, detach |
+| **Chat** | Crew tree in the sidebar; **New mate thread** (RPC reset when no open crew threads), thread chat, steer; overflow: interrupt, exit, relaunch, detach |
 | **Inbox** | Holds, wakes, liveness, stalls, PR signals — resolve, snooze, reply-with-steer |
 | **Board** | Columns by FSM state (working, blocked, idle, done, failed) |
 | **Homes** | Create/select mate homes |

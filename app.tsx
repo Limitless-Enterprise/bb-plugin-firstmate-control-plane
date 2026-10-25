@@ -416,6 +416,8 @@ function FleetPage({ subPath }: { subPath?: string }) {
         return;
       }
       treeRequestHomeId.current = homeId;
+      setTree([]);
+      setInbox([]);
       rpc
         .call("getTree", { homeId })
         .then((result) => {
@@ -450,9 +452,12 @@ function FleetPage({ subPath }: { subPath?: string }) {
         setSelectedHomeId(result.selectedHomeId);
         refetchHome(result.selectedHomeId);
       })
-      .catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : String(cause)),
-      );
+      .catch((cause: unknown) => {
+        if (homesRequestId.current !== requestId) {
+          return;
+        }
+        setError(cause instanceof Error ? cause.message : String(cause));
+      });
     rpc.call("inboxBadge", null).then((result) => setBadge(result));
   }, [rpc, refetchHome]);
 
