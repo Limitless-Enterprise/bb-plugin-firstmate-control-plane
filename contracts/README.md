@@ -71,8 +71,8 @@ profiles:
 
 ## Crew spawn (`bb fleet spawn`)
 
-- The Fleet panel does not expose a manual spawn form; an empty tree shows
-  mate-dispatch guidance. Crews appear when the mate checkout runs native
+- The Fleet main panel does not expose a manual spawn form; an empty sidebar
+  crew tree shows mate-dispatch guidance. Crews appear when the mate checkout runs native
   `fm-spawn` (overlay → `bb fleet spawn`) or when an operator uses CLI.
 - `threads.spawn` uses mate default `providerId` and `model` from plugin settings
   when no profile applies. `--profile <id>` selects a home dispatch profile;
