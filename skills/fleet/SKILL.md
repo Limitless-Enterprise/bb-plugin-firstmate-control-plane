@@ -40,9 +40,10 @@ bb fleet secondmate create --mate cto --thread <threadId> --label platform-lead
 - `bb fleet bearings --mate cto` — CoS bearings snapshot
 - `bb fleet integration apply|check --mate cto` — overlay install/verify
 
-Open the **Fleet** panel in BB for tree + chat (mobile tree toggle; **New mate
-thread** control with preflight and confirm — RPC only, not CLI; blocked while
-open crew threads remain), mate-dispatch guidance when the tree is empty, inbox
-(resolve, snooze, Reply composer with required steer comment — see
-[contracts/README.md](../../contracts/README.md#fleet-inbox-item)), status board, and
-crew overflow controls.
+Open **Fleet** in the BB sidebar (Ship icon). The crew **tree** replaces the
+thread list while Fleet is open; use **Chat**, **Inbox**, or **Board** in the main
+panel. **New mate thread** (sidebar tree; preflight and confirm — RPC only, not
+CLI; blocked while open crew threads remain), mate-dispatch guidance when the tree
+is empty, inbox (resolve, snooze, Reply composer with required steer comment —
+see [contracts/README.md](../../contracts/README.md#fleet-inbox-item)), status
+board, and crew overflow controls.

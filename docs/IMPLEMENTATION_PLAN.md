@@ -95,7 +95,7 @@ bb-plugin-firstmate-control-plane/
 
 ### Phase 3 — Fleet UI core + chrome foundation
 
-- Tree, chat, StatusDot, deep links, settings, realtime, mobile drawer
+- Sidebar crew tree (`experimental_sidebar`), chat-only main panel, StatusDot, deep links, settings, realtime
 - Needs-decision strip stub
 
 **Exit:** Mate + 2 crews visible; dots follow FSM.

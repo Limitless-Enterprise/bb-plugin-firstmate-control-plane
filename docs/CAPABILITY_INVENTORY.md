@@ -212,14 +212,14 @@ Nothing in this list is optional for the full program. M1 completes items throug
 
 | ID | Capability | M1 | Status |
 |---|---|---|---|
-| P-U1 | Tree + ThreadChat | ✓ | ✅ |
+| P-U1 | Sidebar crew tree + main-panel ThreadChat | ✓ | ✅ |
 | P-U2 | Status board tab | ✓ | ✅ |
 | P-U3 | StatusDot ← FSM | ✓ | ✅ |
 | P-U4 | Liveness pip | ✓ | ✅ |
 | P-U5 | Mode + profile + PR chips | ✓ | ✅ |
 | P-U6 | Ship/scout badges | ✓ | ✅ |
 | P-U7 | Deep link /fleet/<threadId> | ✓ | ✅ |
-| P-U8 | Mobile drawer | ✓ | ✅ |
+| P-U8 | BB sidebar crew tree (`experimental_sidebar`; replaces in-panel mobile tree drawer) | ✓ | ✅ |
 | P-U9 | Realtime refresh | ✓ | ✅ |
 | P-U10 | Fleet settings | ✓ | ✅ |
 | P-U11 | Tree empty state (mate dispatch; no panel spawn) | ✓ | ✅ |
@@ -230,7 +230,7 @@ Nothing in this list is optional for the full program. M1 completes items throug
 | P-U16 | Unified cross-home inbox | M2 | 🔲 |
 | P-U17 | Secondmate indent tree | M3 | 🔲 |
 | P-U18 | Homes panel | ✓ | ✅ |
-| P-U19 | New mate thread reset (Tree UI + RPC preflight; spawn-before-archive) | ✓ | ✅ |
+| P-U19 | New mate thread reset (sidebar tree UI + RPC preflight; spawn-before-archive) | ✓ | ✅ |
 
 ### CoS / digest
 

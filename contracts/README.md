@@ -207,8 +207,8 @@ while switching rows; the composer stays open until steer succeeds or shows an e
 `{ inbox, wakes, dead }` for sidebar badges when scoped to a home. `inboxBadge`:
 with a selected home, returns `count` / `wakes` / `dead` from `fleetNavCounts`
 for that home; with no home selected, sums those three fields from
-`fleetNavCounts` across every registered home. **Mate thread reset** (Tree UI only,
-no CLI): `resetMateThreadPreflight` returns `{ allowed, openChildren, mateThreadId,
+`fleetNavCounts` across every registered home. **Mate thread reset** (Fleet sidebar
+tree UI only, no CLI): `resetMateThreadPreflight` returns `{ allowed, openChildren, mateThreadId,
 mateLabel }` after checking BB archive state for each non-primary node (legacy
 `legacy:*` thread ids are ignored; `threads.get` failure fail-closes as blocking).
 `resetMateThread` spawns the replacement mate, stops/archives the previous mate

@@ -172,7 +172,7 @@ export MATE=<homeId>
 ./scripts/m1-ac-full.sh
 ```
 
-Mate reset and meta close-out RPC checks (running BB + installed plugin; same transport as Fleet Tree UI):
+Mate reset and meta close-out RPC checks (running BB + installed plugin; same transport as the Fleet sidebar tree UI):
 
 ```sh
 export MATE=<homeId>
@@ -185,7 +185,7 @@ export BB_CLI=bb   # or rely on scripts/resolve-bb-cli.sh
 ## Architecture (short)
 
 - **Plugin server** (`server.ts`): RPC for panel, SQLite fleet state, background services (supervisor, PR poller, status bridge).
-- **Panel** (`app.tsx`): React UI registered on BB `navPanel` slot `fleet`.
+- **Panel** (`app.tsx`): React UI on BB `navPanel` slot `fleet`; crew tree via `experimental_sidebar` (`FleetSidebarTree`) while Fleet is open; main panel is chat, inbox, board, and homes.
 - **CLI**: `bb fleet` command registered by the plugin.
 - **Overlay**: Optional Firstmate backend wrap under `packages/bb-backend/overlay/` applied into mate checkouts.
 

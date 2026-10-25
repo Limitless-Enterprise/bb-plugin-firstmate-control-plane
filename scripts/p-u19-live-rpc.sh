@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Live P-U19 / P-SYNC checks against a running BB + Fleet plugin (tech mate home).
-# Uses the same RPC transport as the Fleet Tree UI (`bb plugin rpc call`).
+# Uses the same RPC transport as the Fleet sidebar tree UI (`bb plugin rpc call`).
 set -euo pipefail
 
 BB="${BB_CLI:-bb}"

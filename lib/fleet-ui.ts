@@ -1,4 +1,4 @@
-/** Pure Fleet panel routing and copy helpers (P-H11, P-H14, P-U8). */
+/** Pure Fleet panel routing and copy helpers (P-H11, P-H14). */
 
 import type { TreeNode } from "./types";
 
