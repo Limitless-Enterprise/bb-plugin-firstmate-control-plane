@@ -28,10 +28,10 @@ Optional CLI tools on mate worktrees after integration apply: `bb`, `jq` (see ov
 
 ### From Git (recommended for end users)
 
-After a stable release tag exists (CalVer, for example `v2026.9.0`):
+After a stable release tag exists (CalVer, for example `v2026.10.0`):
 
 ```sh
-bb plugin install git:github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane@^2026.9.0 --yes
+bb plugin install git:github.com/Limitless-Enterprise/bb-plugin-firstmate-control-plane@^2026.10.0 --yes
 ```
 
 Track `main` before the first tag:
